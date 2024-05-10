@@ -1,10 +1,6 @@
-# Boilerplate RoboFont Extension
+# Longboard RoboFont Extension
 
-A dummy RoboFont extension to demonstrate the [Extension Folder Structure].
-
-Updated for [RoboFont 4.0]. Previous versions available as tagged releases.
-
-Includes a boilerplate [.mechanic] file for extensions hosted on [GitHub]
+This RoboFont extension draws previews of the current DSE2 designspace in the glyph window. 
 
 The extension is set for automated release handling with GitHub Action using the [RoboFont-Extension-action](https://github.com/typemytype/roboFont-Extension-action).
 
