@@ -1,4 +1,4 @@
-![The LongBoard Icon](longboardMechanicIcon.png)
+![The LongBoard Icon](icon.png)
 
 # Longboard
 
@@ -9,11 +9,11 @@ This is for RoboFont 4.5+ and you need to have the [DesignspaceEditor2 extension
 
 ## Picking axis directions for mouse movement
 
-![LongBoard UI](/source/html/screen_20240510.png)
+![LongBoard UI](screen_20240510.png)
 
-The LongBoard Window shows a table with the continuous axes that are available for exploring for the current glyph. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will make changes to the width axis. And vertical movements will correspond to changes in the weight axis.
+The best thing about Longboard is the smooth navigation of the axes. A single mouse drag manipulates as many axis values as you want. To set it up, use the LongBoard Window. It has a table with the continuous axes that are available for exploring for the current glyph. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will make changes to the width axis. And vertical movements will correspond to changes in the weight axis.
 
-The warning sign pops up when an axis value is outside the minimum / maximum values defined for the axis. Extrapolation!
+The warning sign pops up when an axis value is outside the minimum / maximum values defined for the axis. Extrapolation is a really useful tool in type design. But it is good to know where the extremes are. 
 
 ## Buttons
 
@@ -32,9 +32,10 @@ LongBoard installs a tool in the glyph editor toolbar called **Navigator**. Sele
 
 ## Notes
 
-The mapping of mouse movements to axis values is a bit hard wired in this initial release. As long as your axes have values that are on a 0 - 1000 scale it will be fine, but there may be some speed issues if the axes are on a smaller scale, like 0 - 1. 
+* The mapping of mouse movements to axis values is a bit hard wired in this initial release. As long as your axes have values that are on a 0 - 1000 scale it will be fine, but there may be some speed issues if the axes are on a smaller scale, like 0 - 1. 
+* With this tool most of the functionality that I wrote for **Skateboard** should be available again. **DesignspaceEditor2** does all the heavy lifting. Longboard really is just a small visualiser tool on top of that. I hope these are useful to you. 
 
-With this tool most of the functionality that I wrote for Skateboard should be available again. DesignspaceEditor2 does all the heavy lifting. Longboard really is just a small visualiser tool on top of that. I hope these are useful to you. 
+## Thanks
 
 Thanks to Frederik Berlaen, Tal Leming, Roberto Arista, GitHub Sponsors and all Skateboard and Superpolator users who make the development of tools like this possible.
 

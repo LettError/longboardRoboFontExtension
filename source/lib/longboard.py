@@ -51,7 +51,7 @@ operatorChangedEventKey = toolID + ".operatorChanged.event"
 
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "0.4"
+longBoardVersion = "0.4.1"
 
 class CollectorPen(BasePen):
     def __init__(self, glyphSet, path=None):
@@ -1182,11 +1182,7 @@ class LongboardNavigatorTool(BaseEventTool):
     def getToolbarTip(self):
         return "Longboard Navigator"
 
-#if __name__ == "__main__":
-#    import time
-#    print(time.time(),"refreshed navigator")
-#    OpenWindow(LongBoardUIController)
-
 nt = LongboardNavigatorTool()
 installTool(nt)
+
 OpenWindow(LongBoardUIController) 
