@@ -3,7 +3,7 @@ developer: LettError
 developerURL: http://superpolator.com
 launchAtStartUp: false
 mainScript: ""
-version: 0.2
+version: 0.3
 addToMenu:
 - path: longboard.py
   preferredName: Longboard
