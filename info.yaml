@@ -2,12 +2,12 @@ name: Longboard
 developer: LettError
 developerURL: http://superpolator.com
 launchAtStartUp: false
-mainScript: longboard.py
-version: 0.1
+mainScript: ""
+version: 0.2
 addToMenu:
 - path: longboard.py
   preferredName: Longboard
-  shortKey: []
+  shortKey: ''
 html: true
 timeStamp: 1638366053.720922
 requiresVersionMajor: '4'
