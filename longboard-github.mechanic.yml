@@ -6,5 +6,5 @@ repository: https://github.com/LettError/longboardRoboFontExtension
 extensionPath: Longboard.roboFontExt
 icon: https://raw.githubusercontent.com/letterror/longboardRoboFontExtension/master/longboardMechanicIcon.png
 infoPath: https://raw.githubusercontent.com/letterror/longboardRoboFontExtension/HEAD/info.yaml
-zipPath: https://github.com/LettError/longboardRoboFontExtension/releases/latest/download/Longboard.roboFontExt.zip
+zipPath: https://github.com/letterror/longboardRoboFontExtension/releases/latest/download/Longboard.roboFontExt.zip
 tags: [ interpolation preview mutatormath variablefont ]
