@@ -1184,9 +1184,9 @@ class LongboardNavigatorTool(BaseEventTool):
 
 #if __name__ == "__main__":
 #    import time
-#    nt = LongboardNavigatorTool()
-#    installTool(nt)
 #    print(time.time(),"refreshed navigator")
 #    OpenWindow(LongBoardUIController)
 
+nt = LongboardNavigatorTool()
+installTool(nt)
 OpenWindow(LongBoardUIController) 
