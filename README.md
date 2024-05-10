@@ -1,8 +1,7 @@
-# Longboard RoboFont Extension
+# Longboard
 
-This RoboFont extension draws previews of the current DSE2 designspace in the glyph window. 
-
-The extension is set for automated release handling with GitHub Action using the [RoboFont-Extension-action](https://github.com/typemytype/roboFont-Extension-action).
+Longboard draws previews of the current DSE2 designspace in the glyph window.
+It is the successor of the Skateboard and Superpolator tools.
 
 - - -
 
