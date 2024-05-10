@@ -4,7 +4,7 @@ developer: LettError
 developerURL: https://github.com/LettError
 repository: https://github.com/LettError/longboardRoboFontExtension
 extensionPath: Longboard.roboFontExt
-icon: https://raw.githubusercontent.com/roboDocs/rf-extension-boilerplate/master/myExtensionMechanicIcon.png
+icon: https://raw.githubusercontent.com/letterror/longboardRoboFontExtension/master/longboardMechanicIcon.png
 infoPath: https://raw.githubusercontent.com/letterror/longboardRoboFontExtension/HEAD/info.yaml
-zipPath: https://github.com/robodocs/rf-extension-boilerplate/releases/latest/download/myExtension.roboFontExt.zip
-tags: [ demo ]
+zipPath: https://github.com/LettError/longboardRoboFontExtension/releases/latest/download/Longboard.roboFontExt.zip
+tags: [ interpolation preview mutatormath variablefont ]
