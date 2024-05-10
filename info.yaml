@@ -7,7 +7,7 @@ version: 0.4
 addToMenu:
 - path: longboard.py
   preferredName: Longboard
-  #shortKey: [1179648, b]
+  shortKey: []
 html: true
 timeStamp: 1638366053.720922
 requiresVersionMajor: '4'
