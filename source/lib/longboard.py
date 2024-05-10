@@ -1182,10 +1182,11 @@ class LongboardNavigatorTool(BaseEventTool):
     def getToolbarTip(self):
         return "Longboard Navigator"
 
-if __name__ == "__main__":
-    import time
-    nt = LongboardNavigatorTool()
-    installTool(nt)
-    print(time.time(),"refreshed navigator")
-    OpenWindow(LongBoardUIController)
+#if __name__ == "__main__":
+#    import time
+#    nt = LongboardNavigatorTool()
+#    installTool(nt)
+#    print(time.time(),"refreshed navigator")
+#    OpenWindow(LongBoardUIController)
 
+OpenWindow(LongBoardUIController) 
