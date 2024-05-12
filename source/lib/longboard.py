@@ -7,7 +7,7 @@
 """
 
 import ezui
-import math, time, os
+import math, time, os, traceback
 
 from mojo.UI import inDarkMode
 
@@ -248,7 +248,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         extrapolateState = self.operator.extrapolate
         self.operator.useVarlib = False
         self.operator.extrapolate = True
-        font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
+        try:
+            font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
+        except:
+            print("Something went wrong making the preview, sorry.")
+            print(traceback.format_exc())
+            return
         self.operator.useVarlib = useVarlibState
         self.operator.extrapolate = extrapolateState
         font.save(ufoPath)
@@ -705,11 +710,22 @@ class LongboardEditorView(Subscriber):
     
     def destroy(self):
         # LongboardEditorView
-        self.currentOperator = None
         glyphEditor = self.getGlyphEditor()
         for key in [containerKey, previewContainerKey]:
             container = glyphEditor.extensionContainer(key)
             container.clearSublayers()
+
+        self.instancePathLayer.clearSublayers()
+        self.previewPathLayer.clearSublayers()
+        self.instanceMarkerLayer.clearSublayers()
+        self.marginsPathLayer.clearSublayers()
+        self.measurementMarkerLayer.clearSublayers()
+        self.measurementsIntersectionsLayer.clearSublayers()
+        self.measurementTextLayer.clearSublayers()
+
+        self.updateSourcesOutlines()
+        self.updateInstanceOutline()
+        self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
         # LongboardEditorView
