@@ -12,9 +12,6 @@ import math, time, os
 from mojo.UI import inDarkMode
 
 from mojo.events import (
-    installTool,
-    EditingTool,
-    BaseEventTool,
     setActiveEventTool,
     getActiveEventTool,
     publishEvent,
@@ -32,9 +29,6 @@ from fontTools.pens.basePen import BasePen
 from fontTools.ufoLib.glifLib import writeGlyphToString
 from fontTools.designspaceLib import InstanceDescriptor
 
-
-# get which tool is active
-#print(getActiveEventTool())
 
 eventID = "com.letterror.longboardNavigator"
 navigatorLocationChangedEventKey = eventID + "navigatorLocationChanged.event"
@@ -240,7 +234,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         self.operator.useVarlib = useVarlibState
         self.operator.extrapolate = extrapolateState
-        #print('generated', font)
         font.save(ufoPath)
         OpenFont(font, showInterface=True)
         
@@ -758,14 +751,12 @@ class LongboardEditorView(Subscriber):
     def designspaceEditorPreviewLocationDidChange(self, info):
         # LongboardEditorView
         relevant, font, ds = self.relevantForThisEditor(info)
-        print("designspaceEditorPreviewLocationDidChange", relevant)
         if not relevant:
             return
         loc = self.previewLocation_dragging = info['location']
         # check extrapolations
         currentPreviewContinuous, currentPreviewDiscrete = self.operator.splitLocation(loc)
         self.extrapolating = self.checkExtrapolation(currentPreviewContinuous)
-        print("self.extrapolating", self.extrapolating)     
         self.updateInstanceOutline()
     
     def glyphDidChangeMeasurements(self, info):
@@ -1086,7 +1077,6 @@ class LongboardEditorView(Subscriber):
         # LongboardEditorView
         if info["extrapolate"] is not None:
             self.allowExtrapolation = info["extrapolate"]
-            print("xx self.allowExtrapolation", self.allowExtrapolation)
         if info["showPreview"] is not None:
             self.showPreview = info["showPreview"]
         if info["showSources"] is not None:
@@ -1095,8 +1085,6 @@ class LongboardEditorView(Subscriber):
             self.showPoints = info["showPoints"]
         if info["showMeasurements"] is not None:
             self.showMeasurements = info["showMeasurements"]
-        #if info["useDiscreteLocationOfCurrentFont"] is not None:
-        #    self.useDiscreteLocationOfCurrentFont = info["useDiscreteLocationOfCurrentFont"]
         if info["longBoardHazeFactor"] is not None:
             self.longBoardHazeFactor = info["longBoardHazeFactor"]
         self.setPreferences()
@@ -1121,8 +1109,6 @@ def uiSettingsExtractor(subscriber, info):
         #info["useDiscreteLocationOfCurrentFont"] = lowLevelEvent.get("useDiscreteLocationOfCurrentFont")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
 
-
-# 
 
 
 
@@ -1161,6 +1147,8 @@ registerSubscriberEvent(
     documentation="Posted by the Longboard Navigator Tool to the LongBoardUIController",
     debug=True
 )
+
+
 
 
 OpenWindow(LongBoardUIController) 
