@@ -45,7 +45,24 @@ operatorChangedEventKey = toolID + ".operatorChanged.event"
 
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "0.4.1"
+longBoardVersion = "0.4.4"
+
+
+from mojo.events import (
+    installTool,
+    BaseEventTool,
+)
+
+
+class LongboardNavigatorTool(BaseEventTool):
+    def setup(self):
+        pass
+
+    def getToolbarTip(self):
+        return "Longboard Navigator"
+
+
+
 
 class CollectorPen(BasePen):
     def __init__(self, glyphSet, path=None):
@@ -1151,4 +1168,14 @@ registerSubscriberEvent(
 
 
 
+nt = LongboardNavigatorTool()
+installTool(nt)
+
+
+
+
 OpenWindow(LongBoardUIController) 
+
+
+
+
