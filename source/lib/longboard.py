@@ -1162,27 +1162,5 @@ registerSubscriberEvent(
     debug=True
 )
 
-# registerSubscriberEvent(
-#     subscriberEventName=navigatorUnitChangedEventKey,
-#     methodName="navigatorUnitChanged",
-#     lowLevelEventNames=[navigatorUnitChangedEventKey],
-#     dispatcher="roboFont",
-#     delay=0,
-#     documentation="Posted by the LongBoardUIController to the previewer",
-#     debug=True
-# )
-
-
-class LongboardNavigatorTool(BaseEventTool):
-    def setup(self):
-        pass
-        #self.start = None
-        # I can draw merz here!
-
-    def getToolbarTip(self):
-        return "Longboard Navigator"
-
-nt = LongboardNavigatorTool()
-installTool(nt)
 
 OpenWindow(LongBoardUIController) 
