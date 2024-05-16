@@ -8,6 +8,7 @@
 
 import ezui
 import math, time, os, traceback
+import AppKit
 
 from mojo.UI import inDarkMode
 
@@ -17,6 +18,8 @@ from mojo.events import (
     publishEvent,
     postEvent
 )
+
+from mojo.extensions import ExtensionBundle
 
 from mojo.subscriber import (
     Subscriber,
@@ -42,7 +45,6 @@ previewContainerKey = toolID + ".preview.layer"
 
 settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
-
 interactionSourcesLibKey = toolID + ".interactionSources"
 
 longBoardVersion = "0.4.4"
@@ -61,6 +63,14 @@ class LongboardNavigatorTool(BaseEventTool):
     def getToolbarTip(self):
         return "Longboard Navigator"
 
+    def getToolbarIcon(self):
+        ## return the toolbar icon
+        return toolbarIcon
+
+
+longBoardToolBundle = ExtensionBundle("Longboard")
+toolbarIconPath = os.path.join(longBoardToolBundle.resourcesPath(), "icon.pdf")
+toolbarIcon = AppKit.NSImage.alloc().initWithContentsOfFile_(toolbarIconPath)
 
 
 
