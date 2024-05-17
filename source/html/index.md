@@ -25,7 +25,7 @@ The warning sign pops up when an axis value is outside the minimum / maximum val
 ## Navigator
 
 * LongBoard installs a tool in the glyph editor toolbar called **Longboard Navigator**.
-* This is the icon: ![LongBoard navigator icon in the RoboFont glyph editor toolbar](icon___toolbar.png)
+* This is the icon: ![LongBoard navigator icon in the RoboFont glyph editor toolbar](icon_toolbar.png)
 * Select the tool and drag the cursor around in the glyph editor to explore different axis values. 
 
 ## Checkboxes 
