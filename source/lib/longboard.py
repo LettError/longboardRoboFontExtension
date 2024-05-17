@@ -71,6 +71,7 @@ class LongboardNavigatorTool(BaseEventTool):
 longBoardToolBundle = ExtensionBundle("Longboard")
 toolbarIconPath = os.path.join(longBoardToolBundle.resourcesPath(), "icon.pdf")
 toolbarIcon = AppKit.NSImage.alloc().initWithContentsOfFile_(toolbarIconPath)
+print('toolbarIcon', toolbarIcon)
 
 
 
