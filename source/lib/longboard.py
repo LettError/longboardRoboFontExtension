@@ -69,10 +69,7 @@ class LongboardNavigatorTool(BaseEventTool):
 
 
 longBoardToolBundle = ExtensionBundle("Longboard")
-toolbarIconPath = os.path.join(longBoardToolBundle.resourcesPath(), "icon.pdf")
-toolbarIcon = AppKit.NSImage.alloc().initWithContentsOfFile_(toolbarIconPath)
-print('toolbarIcon', toolbarIcon)
-
+toolbarIcon = longBoardToolBundle.getResourceImage("icon", ext='pdf')
 
 
 class CollectorPen(BasePen):

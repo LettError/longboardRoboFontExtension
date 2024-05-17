@@ -1,10 +1,11 @@
 import os
-m = 643.6
+mm = 643.6
+m = 32
 size(m,m)
 
-s = 347    # size of the center square
-r = 240    # outside circle    
-rs = 98    # inside circle, "hole"
+s = m*347/mm    # size of the center square
+r = m*240/mm    # outside circle    
+rs = m*98/mm    # inside circle, "hole"
 x = width()*.5-s*.5
 y = height()*.5-s*.5
 
@@ -21,7 +22,7 @@ holes = BezierPath()
 holes.oval(x-.5*rs,y-.5*rs, rs, rs)
 holes.oval(x-.5*rs,y+s-.5*rs, rs, rs)
 holes.oval(x+s-.5*rs,y-.5*rs, rs, rs)
-#holes.oval(x+s-.5*rs,y+s-.5*rs, rs, rs)
+holes.oval(x+s-.5*rs,y+s-.5*rs, rs, rs)
 #holes.oval(x+.5*s-.5*rs, y+.5*s-.5*rs, rs, rs )
 
 #p = b.xor(holes)
@@ -37,21 +38,18 @@ rgb1 = (0.0, 0.7, 1.0)
 rgb2 = (0.0, 0.8, 0.2)
 
 versions = [
-    ('_store', (0.0, 0.6, 1.0), (0.9, 0.7, 0.0), 45),
-    ('_develop', (0.81, 0.79, 0.83), (0.8, 0.9, 1.07), 45),
-    ('_student', (0.44, 0.02, 0.9), (0.17, 0.9, 0.97), 45),
-    ('_trial', (1.2, 0.1, 0.57), (1.0, 0.8, 0.2), 45),
-    ('_expired', (0.88, 0.88, .88), (0.98, 0.98, 0.99), 45),
+    ('_icon', 32, (0.0, 0.6, 1.0), (0.9, 0.7, 0.0), 45),
+    ('_toolbar', 32, (0.2, 0.2, 0.2), (0.4, 0.4, 0.4), 45),
     ]
 
 
 #resourcesPath = "/Users/erik/code/superpolator/source/resources"
-resourcesPath = "/Users/erik/code/sp5/source/resources"
+resourcesPath = "/Users/erik/code/longboardRoboFontExtension/source/resources"
 #resourcesPath = os.path.join(os.path.dirname(os.getcwd()), 'extension', 'resources')
 
-mechanicIconPath = "/Users/erik/code/longboard"
+mechanicIconPath = "/Users/erik/code/longboardRoboFontExtension/"
 
-for tag, rgb1, rgb2, angle in versions:
+for tag, sz, rgb1, rgb2, angle in versions:
     
     aa = angle
     a1 = radians(aa)
@@ -88,11 +86,13 @@ for tag, rgb1, rgb2, angle in versions:
         ext = "_name"
     else:
         ext = ""
-    saveImage(os.path.join(resourcesPath, f"superpolatorExtensionIcon{ext}{tag}.png"))
+    saveImage(os.path.join(resourcesPath, f"longboardIcon{ext}{tag}.png"))
+    saveImage(os.path.join(resourcesPath, f"longboardIcon{ext}{tag}.pdf"))
     
     #saveImage(os.path.join(resourcesPath, f"superpolator_icon_512{ext}{tag}.pdf"))
 
     print('mechanicIconPath', mechanicIconPath)
-    saveImage(os.path.join(mechanicIconPath, f"superpolatorMechanicIcon_512{ext}{tag}.png"))
+    saveImage(os.path.join(mechanicIconPath, f"longboardMechanicIcon_{tag}.png"))
+    saveImage(f"/Users/erik/code/longboardRoboFontExtension/source/html/icon__{tag}.png")
     
     
