@@ -1,6 +1,6 @@
 import os
 mm = 643.6
-m = 32
+m = 20
 size(m,m)
 
 s = m*264/mm    # size of the center square
@@ -17,12 +17,18 @@ b.oval(x+s-.5*r,y-.5*r, r, r)
 b.oval(x+s-.5*r,y+s-.5*r, r, r)
 b.removeOverlap()
 
+b.oval(x-.5*rs,y-.5*rs, rs, rs)
+b.oval(x-.5*rs,y+s-.5*rs, rs, rs)
+b.oval(x+s-.5*rs,y-.5*rs, rs, rs)
+b.oval(x+s-.5*rs,y+s-.5*rs, rs, rs)
 
-holes = BezierPath()
-holes.oval(x-.5*rs,y-.5*rs, rs, rs)
-holes.oval(x-.5*rs,y+s-.5*rs, rs, rs)
-holes.oval(x+s-.5*rs,y-.5*rs, rs, rs)
-holes.oval(x+s-.5*rs,y+s-.5*rs, rs, rs)
+
+
+# holes = BezierPath()
+# holes.oval(x-.5*rs,y-.5*rs, rs, rs)
+# holes.oval(x-.5*rs,y+s-.5*rs, rs, rs)
+# holes.oval(x+s-.5*rs,y-.5*rs, rs, rs)
+# holes.oval(x+s-.5*rs,y+s-.5*rs, rs, rs)
 #holes.oval(x+.5*s-.5*rs, y+.5*s-.5*rs, rs, rs )
 
 #p = b.xor(holes)
@@ -66,8 +72,8 @@ for tag, sz, rgb1, rgb2, angle in versions:
     linearGradient(*gradientData)
     print(tag, "linearGradient", gradientData)
     drawPath(b)
-    fill(1,1,1,0.9)
-    drawPath(holes)
+    #fill(1,1,1,0.9)
+    #drawPath(holes)
 
     namePath = BezierPath()
     if addName:
