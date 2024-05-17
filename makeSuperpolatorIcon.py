@@ -3,8 +3,8 @@ mm = 643.6
 m = 32
 size(m,m)
 
-s = m*347/mm    # size of the center square
-r = m*240/mm    # outside circle    
+s = m*264/mm    # size of the center square
+r = m*220/mm    # outside circle    
 rs = m*98/mm    # inside circle, "hole"
 x = width()*.5-s*.5
 y = height()*.5-s*.5
@@ -39,7 +39,7 @@ rgb2 = (0.0, 0.8, 0.2)
 
 versions = [
     ('_icon', 32, (0.0, 0.6, 1.0), (0.9, 0.7, 0.0), 45),
-    ('_toolbar', 32, (0.2, 0.2, 0.2), (0.4, 0.4, 0.4), 45),
+    ('_toolbar', 32, (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), 45),
     ]
 
 
