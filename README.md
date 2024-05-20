@@ -7,7 +7,7 @@ It is the successor to the Skateboard and Superpolator tools.
 
 This is for RoboFont 4.5+ and you need to have the [DesignspaceEditor2 extension](https://github.com/LettError/designSpaceRoboFontExtension) installed. Longboard will activate when you have a designspace open in DSE2, and a glyph edit window for one of the sources.
 
-## Pick an axis directions for mouse movement
+## Mouse movement to axis value
 
 ![LongBoard UI](/source/html/screen_20240510.png)
 

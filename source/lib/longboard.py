@@ -216,7 +216,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 ),
         )
         self.w = ezui.EZPanel(
-            title=f"Longboard {longBoardVersion}",
+            title=f"Longboard",
             content=content,
             descriptionData=descriptionData,
             controller=self,
