@@ -13,7 +13,7 @@ This is for RoboFont 4.5+ and you need to have the [DesignspaceEditor2 extension
 
 The best thing about Longboard is the smooth navigation of the axes! A single mouse drag can manipulate as many axis values as you want. To set it up, use the LongBoard Window. It has a table with the continuous axes that are available for exploring for the current glyph. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will make changes to the width axis values. And vertical movements will correspond to changes in the weight axis values.
 
-The warning sign pops up when an axis value is outside the minimum / maximum values defined for the axis. Extrapolation is a really useful tool in type design. But it is good to know where the extremes are.
+The 😨 indicates an axis value is outside the minimum / maximum values defined for the axis. Extrapolation is a really useful tool in type design. But it is good to know where the extremes are.
 
 Longboard determines the values for the discrete axes from the source you're currently looking at. So if your designspace has a continuous weight and a discrete italic axis, Longboard will show upright weight variations in the upright sources, and italic weight variations in italic sources.
 

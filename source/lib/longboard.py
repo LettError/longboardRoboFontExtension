@@ -406,7 +406,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                         if self.checkAxisValueInExtremes(operator, axisName, axisValue):
                             axisWarning = ""
                         else:
-                            axisWarning = "⚠️"
+                            axisWarning = "😨"
                     items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=f"{axisValue:3.2f}"))
             else:
                 v = 0
