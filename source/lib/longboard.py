@@ -523,6 +523,7 @@ class LongboardEditorView(Subscriber):
     def build(self):
         # LongboardEditorView
         self.setPreferences()
+        self.operator = None
         self.currentOperator = None
         self.allowExtrapolation = True    # should we show extrapolation
         self.extrapolating = False    # but are we extrapolating?
