@@ -270,7 +270,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def copyClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
         currentPreviewLocation = self.operator.getPreviewLocation()
-        name = CurrentGlyph().name
+        glyph = CurrentGlyph()
+        if glyph is None: return
+        name = glyph.name
         mathGlyph = self.operator.makeOneGlyph(name, location=currentPreviewLocation)
         if mathGlyph is not None:
             clipboardGlyph = RGlyph()
@@ -870,8 +872,10 @@ class LongboardEditorView(Subscriber):
                     horizontalAlignment="center",
                     )
                 textLayer.setText(f"{dist:3.2f}")
-        
+    
     def updateSourcesOutlines(self):
+        if self.operator is None:
+            return
         # LongboardEditorView
         # everything necessary to update the sources, not time sensitive
         if self.darkMode != inDarkMode():
@@ -879,8 +883,6 @@ class LongboardEditorView(Subscriber):
         self.sourcesPathLayer.clearSublayers()
         self.pointsPathLayer.clearSublayers()
         self.sourcesMarkerLayer.clearSublayers()
-        if self.operator is None:
-            return
         ds = self.operator
         editorGlyph = self.getGlyphEditor().getGlyph()
         cpCurrent = CollectorPen(glyphSet=editorGlyph.font)
@@ -898,8 +900,6 @@ class LongboardEditorView(Subscriber):
             if dl[0] is not None:
                 discreteLocationForCurrentSource = dl[0]
 
-
-        ds = self.operator
         items, unicodes = ds.collectSourcesForGlyph(glyphName=editorGlyph.name, decomposeComponents=True, discreteLocation=discreteLocationForCurrentSource)
         for item in items:
             loc, srcMath, thing = item
@@ -1004,12 +1004,12 @@ class LongboardEditorView(Subscriber):
             return
         if self.previewLocation_dragging is None:
             return
+        editorGlyph = self.getGlyphEditor().getGlyph()
+        if editorGlyph is None:
+            return
 
         ds = self.operator
-        editorGlyph = self.getGlyphEditor().getGlyph()
-        #cpCurrent = CollectorPen(glyphSet=editorGlyph.font)
         sourcePens = []
-        #editorGlyph.draw(cpCurrent)
             
         # # boldly assume a font is only in a single discrete location
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
