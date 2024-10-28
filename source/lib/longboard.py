@@ -409,7 +409,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                             axisWarning = ""
                         else:
                             axisWarning = "😨"
-                    items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=f"{axisValue:3.2f}"))
+                    items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=axisValue))
             else:
                 v = 0
                 for axisObject in operator.getOrderedContinuousAxes():
@@ -721,21 +721,26 @@ class LongboardEditorView(Subscriber):
     
     def destroy(self):
         # LongboardEditorView
+        print(f"destroying {self}. Expecting to clear the layers here.")
         glyphEditor = self.getGlyphEditor()
         for key in [containerKey, previewContainerKey]:
             container = glyphEditor.extensionContainer(key)
+            print('destroy', container, key)
             container.clearSublayers()
 
-        self.instancePathLayer.clearSublayers()
-        self.previewPathLayer.clearSublayers()
-        self.instanceMarkerLayer.clearSublayers()
-        self.marginsPathLayer.clearSublayers()
-        self.measurementMarkerLayer.clearSublayers()
-        self.measurementsIntersectionsLayer.clearSublayers()
-        self.measurementTextLayer.clearSublayers()
+        #container = self.w.view.getMerzContainer()
+        #container.clearSublayers()
 
-        self.updateSourcesOutlines()
-        self.updateInstanceOutline()
+        #self.instancePathLayer.clearSublayers()
+        #self.previewPathLayer.clearSublayers()
+        #self.instanceMarkerLayer.clearSublayers()
+        #self.marginsPathLayer.clearSublayers()
+        #self.measurementMarkerLayer.clearSublayers()
+        #self.measurementsIntersectionsLayer.clearSublayers()
+        #self.measurementTextLayer.clearSublayers()
+
+        #self.updateSourcesOutlines()
+        #self.updateInstanceOutline()
         self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
@@ -876,6 +881,7 @@ class LongboardEditorView(Subscriber):
     def updateSourcesOutlines(self):
         if self.operator is None:
             return
+        print('updateSourcesOutlines')
         # LongboardEditorView
         # everything necessary to update the sources, not time sensitive
         if self.darkMode != inDarkMode():
@@ -989,6 +995,7 @@ class LongboardEditorView(Subscriber):
     def updateInstanceOutline(self):
         # LongboardEditorView
         # everything necessary to update the preview, time sensitive
+        print("updateInstanceOutline")
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
         self.instancePathLayer.clearSublayers()
