@@ -3,9 +3,12 @@
     Fast, interactive previews of glyphs in a designspace.
     
     erik@letterror.com
-    May 2024
+    October 2024
 """
 
+import importlib
+import ufoProcessor.ufoOperator
+importlib.reload(ufoProcessor.ufoOperator)
 import ezui
 import math, time, os, traceback
 import AppKit
@@ -249,6 +252,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
         if self.operator is None: return
         if self.operator.path is None: return
+        self.operator.loadFonts()
+        print('self.operator.glyphNames', self.operator.glyphNames)
         ufoNameMathTag = "MM"
         currentPreviewLocation = self.operator.getPreviewLocation()
         currentPreviewContinuous, currentPreviewDiscrete = self.operator.splitLocation(currentPreviewLocation)
@@ -257,26 +262,31 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         instanceDescriptor.familyName = defaultFont.info.familyName
         instanceDescriptor.styleName = self.locationToString(currentPreviewLocation)
         instanceDescriptor.location = currentPreviewLocation
+        print("preparing a preview UFO at", currentPreviewLocation)
         ufoName = f"Preview_{instanceDescriptor.familyName}-{instanceDescriptor.styleName}_{ufoNameMathTag}.ufo"
         docFolder = os.path.dirname(self.operator.path)
         previewFolder = os.path.join(docFolder, self.previewsFolderName)
         if not os.path.exists(previewFolder):
             os.makedirs(previewFolder)
         ufoPath = os.path.join(previewFolder, ufoName)
+        print("preview UFO path", ufoPath)
         useVarlibState = self.operator.useVarlib
         extrapolateState = self.operator.extrapolate
         self.operator.useVarlib = False
         self.operator.extrapolate = True
+        self.operator.startDebug()
         try:
             font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         except:
             print("Something went wrong making the preview, sorry.")
             print(traceback.format_exc())
             return
+        print('done generating')
         self.operator.useVarlib = useVarlibState
         self.operator.extrapolate = extrapolateState
         font.save(ufoPath)
-        OpenFont(font, showInterface=True)
+        font.close()
+        OpenFont(ufoPath, showInterface=True)
         
     def copyClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
@@ -1125,6 +1135,7 @@ class LongboardEditorView(Subscriber):
                     marginLayer = self.marginsPathLayer.getSublayer(marginLayerName)
                     if marginLayer is None:
                         marginLayer = self.marginsPathLayer.appendPathSublayer(
+                            name = marginLayerName,
                             strokeColor = self.vectorStrokeColor,
                             strokeDash = self.previewStrokeDash,
                             strokeWidth = 1,
