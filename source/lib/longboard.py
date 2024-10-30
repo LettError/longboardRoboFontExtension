@@ -10,6 +10,8 @@ import ezui
 import math, time, os, traceback
 import AppKit
 
+import merz
+
 from mojo.UI import inDarkMode
 
 from mojo.events import (
@@ -56,6 +58,11 @@ from mojo.events import (
 )
 
 
+def glyphEditorIsInZoom():
+    # detect if we're zooming at the moment
+    tool = getActiveEventTool()
+    return bool(tool._zooming)
+
 class LongboardNavigatorTool(BaseEventTool):
     def setup(self):
         pass
@@ -83,8 +90,9 @@ class CollectorPen(BasePen):
     def setOffset(self, x=0,y=0):
         self.offset = x, y
     def _moveTo(self, pos):
-        self.onCurves.append((pos[0]+self.offset[0], pos[1]+self.offset[1]))
-        self.startPoints.append(self._pointIndex)
+        mp = (pos[0]+self.offset[0], pos[1]+self.offset[1])
+        self.onCurves.append(mp)
+        self.startPoints.append(mp)
         self._pointIndex += 1
     def _lineTo(self, pos):
         self.onCurves.append((pos[0]+self.offset[0], pos[1]+self.offset[1]))
@@ -159,9 +167,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> (Reset Current Location) @resetPreview
         
         > * VerticalStack @column2
-        >> [X] Show Preview Outline @showPreview
-        >> [X] Show Source Outlines @showSources
-        >> [X] Show Construction @showPoints
+        >> [X] Show Preview @showPreview
+        >> [X] Show Sources @showSources
+        >> [X] Show Vectors @showPoints
         >> [X] Show Measurements @showMeasurements
         >> [X] Allow Extrapolation @allowExtrapolation
 
@@ -236,6 +244,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # Why in longboard and not in DSE? Because it is more about evaluating the
         # current location than it is about adding a new instance to the designspace.
         # Make the UFO filename as Skateboard did it. 
+        
+        # XXX Preview UFO opens empty
+        
         if self.operator is None: return
         if self.operator.path is None: return
         ufoNameMathTag = "MM"
@@ -305,7 +316,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # callback for the interaction sources table
         # maybe it can have a less generic name than "tableEditCallback"
         # tableEditCallback [{'textValue': 'weight', 'popUpValue': 0}]
-        # @@
         prefs = []
         for axis in self.w.getItem("table").get():
             axisName = axis['textValue']
@@ -343,14 +353,14 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
     def navigatorLocationChanged(self, info):
         # LongBoardUIController
-        # @@ receive notifications about the navigator location changing.
+        # receive notifications about the navigator location changing.
         # scale mouse movement to "increment units"
         # operatpr has the axes data
         # glypheditor has the viewscale
         # UI has the axis masks
-        # @@ sort extrapolation here?
-        # @@ or post the filter table when it changes
-        # @@ and handle everything in glypheditor?
+        # sort extrapolation here?
+        # or post the filter table when it changes
+        # and handle everything in glypheditor?
         view = info["lowLevelEvents"][-1].get('view')
         offset = view.offset()
         viewScale = view.scale()
@@ -381,7 +391,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
             editorObject.previewLocation_dragging = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
-        editorObject.updateInstanceOutline()
+        # update the instance outline, but not a rebuild, just move the points
+        editorObject.updateInstanceOutline(rebuild=False)
         
     def relevantOperatorChanged(self, info):
         # LongBoardUIController
@@ -389,7 +400,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         operator = info["lowLevelEvents"][0].get('operator')
         if operator is None: return
         currentLocation = operator.getPreviewLocation()
-        # @@ ask operator for the interaction sources stored in its lib
+        # ask operator for the interaction sources stored in its lib
         if operator is not None:
             items = []
             prefs = []
@@ -496,28 +507,32 @@ class LongboardEditorView(Subscriber):
         if self.darkMode:
             fillModel = (.5,.5,.5, previewHaze)
             strokeModel = (1,1,1, haze)
+            self.measurementStrokeColor = (0, 1, 1, haze)
+            self.measurementFillColor = (0, 1, 1, haze)
         else:
             fillModel = (.5,.5,.5, previewHaze)
             strokeModel = (0,0,0,haze)
-        self.measurementStrokeColor = strokeModel
-        self.measurementFillColor = strokeModel
+            self.measurementStrokeColor = (0, .25, .5, haze)
+            self.measurementFillColor = (0, .25, .5, haze)
         self.sourceStrokeColor = strokeModel
         self.instanceStrokeColor = strokeModel
-        self.vectorStrokeColor = strokeModel
-        #self.previewFillColor = fillModel
+        self.vectorStrokeColor = (strokeModel[0], strokeModel[1], strokeModel[2], .5*strokeModel[3])
+        self.previewFillColor = fillModel
         self.previewStrokeColor = fillModel
         
     def setPreferences(self):
         # LongboardEditorView
         self.darkMode = inDarkMode()
-        self.measurementMarkerSize = 5
+        self.measurementMarkerSize = 2
         self.measurementStrokeWidth = 1
         self.measurementStrokeDash = (1, 3)
-        self.previewStrokeDash = (1, 3)
-        self.vectorStrokeDash = (1, 3)
-        self.sourceStrokeDash = (30, 2)
-        self.instanceStrokeWidth = 0.5
-        self.markerSize = 3
+        self.previewStrokeDash = (4, 4)
+        self.vectorStrokeDash = (2, 2)
+        self.sourceStrokeDash = (1, 2)
+        self.instanceStrokeDash = (5, 2)
+        self.instanceStrokeWidth = 1
+        self.instanceMarkerSize = 4
+        self.sourceMarkerSize = 3
         self.measureLineCurveOffset = 50
         self.marginLineHeight = 50    # the height of the margin line in the preview
         self.setColors()
@@ -531,6 +546,8 @@ class LongboardEditorView(Subscriber):
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showSources = False
+        self.sourcePens = []
+        self.sourceGlyphs = []
         self.centerAllGlyphs = True
         self.showPoints = True
         self.showMeasurements = True
@@ -551,7 +568,7 @@ class LongboardEditorView(Subscriber):
 
         self.previewPathLayer = self.previewContainer.appendPathSublayer(
             strokeColor = self.previewStrokeColor,
-            #strokeDash = self.previewStrokeDash,
+            strokeDash = self.previewStrokeDash,
             strokeWidth = 1,
             fillColor = None,
         )
@@ -559,13 +576,14 @@ class LongboardEditorView(Subscriber):
         self.instancePathLayer = self.editorContainer.appendPathSublayer(
             strokeColor=self.instanceStrokeColor,
             strokeWidth=self.instanceStrokeWidth,
+            strokeDash = self.instanceStrokeDash,
             fillColor = None
         )
         self.sourcesPathLayer = self.editorContainer.appendPathSublayer(
             strokeColor=self.sourceStrokeColor,
             strokeWidth=self.instanceStrokeWidth,
             fillColor = None,
-            strokeDash=self.vectorStrokeDash,
+            strokeDash = self.sourceStrokeDash,
             strokeCap="round",
         )
         self.pointsPathLayer = self.editorContainer.appendLineSublayer(
@@ -575,49 +593,13 @@ class LongboardEditorView(Subscriber):
             strokeDash=self.vectorStrokeDash,
             strokeCap="round",
         )
-        self.marginsPathLayer = self.editorContainer.appendLineSublayer(
-            strokeColor=self.vectorStrokeColor,
-            strokeWidth=self.instanceStrokeWidth,
-            fillColor = None,
-            strokeDash=self.vectorStrokeDash,
-            strokeCap="round",
-        )
-        self.sourcesMarkerLayer = self.editorContainer.appendSymbolSublayer(
-            fillColor = self.sourceStrokeColor,
-        )
-        self.sourcesMarkerLayer.setImageSettings(
-            dict(
-                name="rectangle",
-                size=(self.markerSize, self.markerSize),
-                fillColor=self.sourceStrokeColor
-            )
-        )
-        self.instanceMarkerLayer = self.editorContainer.appendSymbolSublayer(
-            fillColor = self.sourceStrokeColor,
-        )
-        self.instanceMarkerLayer.setImageSettings(
-            dict(
-                name="rectangle",
-                size=(self.markerSize, self.markerSize),
-                fillColor=self.sourceStrokeColor
-            )
-        )
-        self.measurementsIntersectionsLayer = self.editorContainer.appendLineSublayer(
-            strokeColor=self.measurementStrokeColor,
-            strokeWidth=self.measurementStrokeWidth,
-            strokeDash = self.measurementStrokeDash,
-            fillColor = None,
-        )
-        self.measurementMarkerLayer = self.editorContainer.appendSymbolSublayer(
-        )
-        self.measurementMarkerLayer.setImageSettings(
-            dict(
-                name="oval",
-                size=(self.measurementMarkerSize, self.measurementMarkerSize),
-                fillColor=self.measurementStrokeColor
-            )
-        )
+        self.marginsPathLayer = self.editorContainer.appendBaseSublayer()
+        self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
+        self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
+        self.measurementsIntersectionsLayer = self.editorContainer.appendBaseSublayer()
+        self.measurementMarkerLayer = self.editorContainer.appendBaseSublayer()
         self.measurementTextLayer = self.editorContainer.appendBaseSublayer()
+
 
     def glyphEditorWillShowPreview(self, info):
         self.preparePreview = True
@@ -630,6 +612,7 @@ class LongboardEditorView(Subscriber):
     def glyphEditorDidMouseDown(self, info):
         # LongboardEditorView
         # starting drag
+        print('glyphEditorDidMouseDown')
         self.dragging = True
         self.setColors(active=True)
         self.navigatorToolPosition = None
@@ -637,8 +620,7 @@ class LongboardEditorView(Subscriber):
         # then update the local copy while we're dragging
         self.previewLocation_dragging = self.operator.getPreviewLocation()
         self._lastEventTime = None
-        self.updateSourcesOutlines()
-        self.updateInstanceOutline()
+        self.updateInstanceOutline(rebuild=False)
     
     def glyphEditorDidMouseUp(self, info):
         # LongboardEditorView
@@ -657,6 +639,11 @@ class LongboardEditorView(Subscriber):
         # Otherwise this could have gone straight to the UI.
         if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
         if not self.operator: return
+        
+        zooming = glyphEditorIsInZoom()
+        if zooming:
+            print('glyphEditorDidMouseDrag zooming')
+
         view = info["lowLevelEvents"][-1].get('view')
         viewScale = view.scale()
         pt = info["lowLevelEvents"][-1]['point']
@@ -674,7 +661,6 @@ class LongboardEditorView(Subscriber):
         t = event.timestamp()
         timeSinceLastEvent = t - self._lastEventTime
         self._lastEventTime = t
-        # @@
         # this is the data we're going to send to the UI
         # the UI knows about the directions and the units
         # we're also going to pass the editor object
@@ -721,32 +707,15 @@ class LongboardEditorView(Subscriber):
     
     def destroy(self):
         # LongboardEditorView
-        print(f"destroying {self}. Expecting to clear the layers here.")
-        glyphEditor = self.getGlyphEditor()
-        for key in [containerKey, previewContainerKey]:
-            container = glyphEditor.extensionContainer(key)
-            print('destroy', container, key)
-            container.clearSublayers()
-
-        #container = self.w.view.getMerzContainer()
-        #container.clearSublayers()
-
-        #self.instancePathLayer.clearSublayers()
-        #self.previewPathLayer.clearSublayers()
-        #self.instanceMarkerLayer.clearSublayers()
-        #self.marginsPathLayer.clearSublayers()
-        #self.measurementMarkerLayer.clearSublayers()
-        #self.measurementsIntersectionsLayer.clearSublayers()
-        #self.measurementTextLayer.clearSublayers()
-
-        #self.updateSourcesOutlines()
-        #self.updateInstanceOutline()
+        self.editorContainer.clearSublayers()
+        self.previewContainer.clearSublayers()
         self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
         # LongboardEditorView
         # when the glyph in the editor has changed
         # get the previewlocation from the designspace
+        # rebuild all the layers
         relevant, font, ds = self.relevantForThisEditor(info)
         if not relevant:
             return
@@ -767,8 +736,8 @@ class LongboardEditorView(Subscriber):
                             ds.setPreviewLocation(previewContinuous)
         else:
             ds.setPreviewLocation(previewContinuous)
-        self.updateSourcesOutlines()
-        self.updateInstanceOutline()
+        self.updateSourcesOutlines(rebuild=True)
+        self.updateInstanceOutline(rebuild=True)
 
     #    designspaceEditorSourcesDidAddSource
     #    designspaceEditorSourcesDidRemoveSource
@@ -780,10 +749,12 @@ class LongboardEditorView(Subscriber):
     
     def designspaceEditorSourceGlyphDidChange(self, info):
         # LongboardEditorView
+        # rebuild all the layers
         relevant, font, ds = self.relevantForThisEditor(info)
         if not relevant:
             return
-        self.updateInstanceOutline()
+        self.updateSourcesOutlines(rebuild=True)
+        self.updateInstanceOutline(rebuild=True)
 
     def checkExtrapolation(self, location):
         # check if the axis Value for axis name is in between minimum and maximum
@@ -799,6 +770,7 @@ class LongboardEditorView(Subscriber):
         
     def designspaceEditorPreviewLocationDidChange(self, info):
         # LongboardEditorView
+        # only update the layers
         relevant, font, ds = self.relevantForThisEditor(info)
         if not relevant:
             return
@@ -806,18 +778,23 @@ class LongboardEditorView(Subscriber):
         # check extrapolations
         currentPreviewContinuous, currentPreviewDiscrete = self.operator.splitLocation(loc)
         self.extrapolating = self.checkExtrapolation(currentPreviewContinuous)
-        self.updateInstanceOutline()
+        self.updateInstanceOutline(rebuild=False)
     
     def glyphDidChangeMeasurements(self, info):
         # LongboardEditorView
+        # only update the layers
         relevant, font, ds = self.relevantForThisEditor(info)
         if not relevant:
             return
         self.updateInstanceOutline()
     
+    def layerTag(self, *items):
+        return "_".join(items)
+        
     def drawMeasurements(self, editorGlyph, previewShift, previewGlyph):
         # LongboardEditorView
         # draw intersections for the current measuring beam and the current preview
+        # only update the layers
         for m in editorGlyph.measurements:
             if m.startPoint is None or m.endPoint is None:
                 continue
@@ -837,65 +814,81 @@ class LongboardEditorView(Subscriber):
                 measureLineAngle = math.atan2(mp1[1]-mp2[1], mp1[0]-mp2[0]) - .5*math.pi
                 # draw the jumper curve
                 bcp1 = mp1[0]
-                jumperLayer = self.measurementsIntersectionsLayer.appendPathSublayer(
-                    strokeWidth=self.measurementStrokeWidth,
-                    strokeColor=self.measurementStrokeColor,
-                    strokeDash = self.measurementStrokeDash,
-                    fillColor=None,
-                )
+                # layer append or update? 1
+                jumperLayerName = f"measurementJumperLine_{editorGlyph.name}_{i}"
+                jumperLayer = self.measurementsIntersectionsLayer.getSublayer(jumperLayerName)
+                if jumperLayer is None:
+                    jumperLayer = self.measurementsIntersectionsLayer.appendPathSublayer(
+                        name=jumperLayerName,
+                        strokeWidth=self.measurementStrokeWidth,
+                        strokeColor=self.measurementStrokeColor,
+                        strokeDash = self.measurementStrokeDash,
+                        fillColor=None,
+                    )
                 needlex = math.cos(measureLineAngle) * self.measureLineCurveOffset
                 needley = math.sin(measureLineAngle) * self.measureLineCurveOffset
                 jumperPen = jumperLayer.getPen(clear=True)
                 jumperPen.moveTo(mp1)
                 jumperPen.curveTo((mp1[0]+needlex, mp1[1]+needley), (mp2[0]+needlex, mp2[1]+needley), (mp2[0], mp2[1]))
                 jumperPen.endPath()
+                
                 # draw the end markers
-                symbolLayer = self.measurementMarkerLayer.appendSymbolSublayer(position=mp1)
-                symbolLayer.setImageSettings(
-                    dict(
-                        name="oval",
-                        size=(self.measurementMarkerSize, self.measurementMarkerSize),
-                        fillColor=self.measurementFillColor
+                # layer append or update? 2
+                measurementMarkerLayerName = f"measurementMarker_{editorGlyph.name}_{i}_start"
+                measurementMarkerLayer = self.measurementMarkerLayer.getSublayer(measurementMarkerLayerName)
+                if measurementMarkerLayer is None:
+                    measurementMarkerLayer = self.measurementMarkerLayer.appendSymbolSublayer(
+                        position=mp1,
+                        imageSettings = dict(
+                            name="oval",
+                            size=(self.measurementMarkerSize, self.measurementMarkerSize),
+                            fillColor=self.measurementFillColor
+                            ),
                         )
+                measurementMarkerLayer.setPosition(mp1)
+                # layer append or update? 3
+                measurementMarkerLayerName = f"measurementMarker_{editorGlyph.name}_{i}_end"
+                measurementMarkerLayer = self.measurementMarkerLayer.getSublayer(measurementMarkerLayerName)
+                if measurementMarkerLayer is None:
+                    measurementMarkerLayer = self.measurementMarkerLayer.appendSymbolSublayer(
+                        position=mp2,
+                        imageSettings = dict(
+                            name="oval",
+                            size=(self.measurementMarkerSize, self.measurementMarkerSize),
+                            fillColor=self.measurementFillColor
+                        ),
                     )
-                symbolLayer = self.measurementMarkerLayer.appendSymbolSublayer(position=mp2)
-                symbolLayer.setImageSettings(
-                    dict(
-                        name="oval",
-                        size=(self.measurementMarkerSize, self.measurementMarkerSize),
-                        fillColor=self.measurementFillColor
-                        )
-                    )
+                measurementMarkerLayer.setPosition(mp2)
                 # draw the measurement distance text
                 textPos = .5*(mp1[0]+mp2[0])+needlex, .5*(mp1[1]+mp2[1])+needley
                 dist = math.hypot(mp1[0]-mp2[0], mp1[1]-mp2[1])
                 #$$
-                textLayer= self.measurementTextLayer.appendTextLineSublayer(
-                    position=textPos,
-                    pointSize=11,
-                    fillColor=self.measurementFillColor,
-                    horizontalAlignment="center",
-                    )
-                textLayer.setText(f"{dist:3.2f}")
+                # layer append or update? 4
+                measurementTextLayerName = f"measurementText_{editorGlyph.name}_{i}"
+                measurementTextLayer = self.measurementTextLayer.getSublayer(measurementTextLayerName)
+                if measurementTextLayer is None:
+                    measurementTextLayer= self.measurementTextLayer.appendTextLineSublayer(
+                        name=measurementTextLayerName,
+                        position=textPos,
+                        pointSize=11,
+                        fillColor=self.measurementFillColor,
+                        horizontalAlignment="center",
+                        )
+                measurementTextLayer.setText(f"{dist:3.2f}")
+                measurementTextLayer.setPosition(textPos)
     
-    def updateSourcesOutlines(self):
+    
+    # XX seperate the collection of the source glyph data
+    # XX from the drawing of the same
+    
+    def prepareSourcesOutlines(self, rebuild=True):
         if self.operator is None:
             return
-        print('updateSourcesOutlines')
-        # LongboardEditorView
-        # everything necessary to update the sources, not time sensitive
-        if self.darkMode != inDarkMode():
-            self.darkMode = not self.darkMode
-        self.sourcesPathLayer.clearSublayers()
-        self.pointsPathLayer.clearSublayers()
-        self.sourcesMarkerLayer.clearSublayers()
         ds = self.operator
         editorGlyph = self.getGlyphEditor().getGlyph()
-        cpCurrent = CollectorPen(glyphSet=editorGlyph.font)
-        sourcePens = []
-        editorGlyph.draw(cpCurrent)
-
-        # # boldly assume a font is only in a single discrete location
+        #self.currentCollectorPen = CollectorPen(glyphSet=editorGlyph.font)
+        self.sourcePens = []
+        self.sourceGlyphs = []
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
         continuousLocationForCurrentSource = {}
         discreteLocationForCurrentSource = {}
@@ -905,103 +898,97 @@ class LongboardEditorView(Subscriber):
         if dl:
             if dl[0] is not None:
                 discreteLocationForCurrentSource = dl[0]
-
+        # draw the source glyphs
         items, unicodes = ds.collectSourcesForGlyph(glyphName=editorGlyph.name, decomposeComponents=True, discreteLocation=discreteLocationForCurrentSource)
         for item in items:
             loc, srcMath, thing = item
             sourcePen = CollectorPen(glyphSet={})
             # do not draw the master we're drawing in
             # 
-            if loc==continuousLocationForCurrentSource: continue
-            srcGlyph = RGlyph()
-            srcMath.extractGlyph(srcGlyph.asDefcon())
+            #if loc==continuousLocationForCurrentSource: continue
+            sourceGlyph = RGlyph()
+            srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
             if self.centerAllGlyphs:
-                xMin, yMin, xMax, yMax = srcGlyph.bounds
+                xMin, yMin, xMax, yMax = sourceGlyph.bounds
                 # centering
-                shift = .5*editorGlyph.width-.5*srcGlyph.width
-                srcGlyph.moveBy((shift, 0))
-            srcGlyph.draw(sourcePen)
-            sourcePens.append(sourcePen)
+                shift = .5*editorGlyph.width-.5*sourceGlyph.width
+                sourceGlyph.moveBy((shift, 0))
+            sourceGlyph.draw(sourcePen)
+            self.sourcePens.append(sourcePen)
+            self.sourceGlyphs.append(sourceGlyph)
 
-        if self.showSources:
-            path = srcGlyph.getRepresentation("merz.CGPath")
-            layer = self.sourcesPathLayer.appendPathSublayer(
-                fillColor=None,
-                strokeColor=self.sourceStrokeColor,
-                strokeWidth=self.instanceStrokeWidth,
-                strokeDash=self.sourceStrokeDash,
-                strokeCap="round",
-                )
-            layer.setPath(path)
+    def updateSourcesOutlines(self, rebuild=True):
+        if self.operator is None:
+            return
 
-        if self.showPoints:
-            # draw the oncurve point vectors
-            for s in sourcePens:
-                for a, b in zip(cpCurrent.onCurves, s.onCurves):
-                    lineLayer = self.pointsPathLayer.appendLineSublayer(
-                        startPoint=a,
-                        endPoint=b,
-                        strokeWidth=self.instanceStrokeWidth,
-                        strokeColor=self.vectorStrokeColor,
-                        strokeDash=self.vectorStrokeDash,
-                        strokeCap="round",
-                    )
-                    symbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(position=a)
-                    symbolLayer.setImageSettings(
-                        dict(
-                            name="oval",
-                            size=(self.markerSize, self.markerSize),
-                            fillColor=self.vectorStrokeColor
-                            )
-                        )
-                    symbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(position=b)
-                    symbolLayer.setImageSettings(
-                        dict(
-                            name="oval",
-                            size=(self.markerSize, self.markerSize),
-                            fillColor=self.vectorStrokeColor
-                            )
-                        )
-
-        if self.showPoints:
-            # show the off curve point vectors
-            for s in sourcePens:
-                for a, b in zip(cpCurrent.offCurves, s.offCurves):
-                    lineLayer = self.pointsPathLayer.appendLineSublayer(
-                        startPoint=a,
-                        endPoint=b,
-                        strokeWidth=self.instanceStrokeWidth,
-                        strokeColor=self.vectorStrokeColor,
-                        strokeDash=self.vectorStrokeDash,
-                        strokeCap="round",
-                    )
-                    symbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(position=a)
-                    symbolLayer.setImageSettings(
-                        dict(
-                            name="oval",
-                            size=(self.markerSize, self.markerSize),
-                            fillColor=self.sourceStrokeColor
-                            )
-                        )
-                    symbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(position=b)
-                    symbolLayer.setImageSettings(
-                        dict(
-                            name="oval",
-                            size=(self.markerSize, self.markerSize),
-                            fillColor=self.sourceStrokeColor
-                            )
-                        )
-        
-    def updateInstanceOutline(self):
+        zooming = glyphEditorIsInZoom()
+        print("updateSourcesOutlines rebuild", rebuild, zooming)
         # LongboardEditorView
-        # everything necessary to update the preview, time sensitive
-        print("updateInstanceOutline")
+        # everything necessary to update the sources, not time sensitive
+
+        self.prepareSourcesOutlines(rebuild=rebuild)
+
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
-        self.instancePathLayer.clearSublayers()
-        self.previewPathLayer.clearSublayers()
-        self.instanceMarkerLayer.clearSublayers()
-        self.marginsPathLayer.clearSublayers()
+        if rebuild:
+            self.sourcesPathLayer.clearSublayers()
+            self.pointsPathLayer.clearSublayers()
+            self.sourcesMarkerLayer.clearSublayers()
+
+        if self.showSources:
+            for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
+                sourceGlyphsLayerName = f"sourceGlyphPath_{sourceGlyphIndex}"
+                sourceGlyphsLayer = self.sourcesPathLayer.getSublayer(sourceGlyphsLayerName)
+                if sourceGlyphsLayer is None:
+                    # layer append or update? 5
+                    sourceGlyphsLayer = self.sourcesPathLayer.appendPathSublayer(
+                        name=sourceGlyphsLayerName,
+                        fillColor=None,
+                        strokeColor=self.sourceStrokeColor,
+                        strokeWidth=self.instanceStrokeWidth,
+                        strokeDash=self.sourceStrokeDash,
+                        strokeCap="round",
+                        )
+                sourceGlyphsLayer.setPath(sourceGlyph.getRepresentation("merz.CGPath"))
+
+        # if self.showPoints:
+        #     # show the on curve point vectors
+        #     for sourcePenIndex, sourcePen in enumerate(self.sourcePens):
+        #         for sourceOnCurveIndex, p in enumerate(sourcePen.onCurves):
+        #             isStart = p in sourcePen.startPoints
+        #             # layer append or update? 10
+        #             sourceOnCurveSymbolLayerName = f"source_marker_{sourcePenIndex}_{sourceOnCurveIndex}"
+        #             sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.getSublayer(sourceOnCurveSymbolLayerName)
+        #             if sourceOnCurveSymbolLayer is None:
+        #                 sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(
+        #                     name = sourceOnCurveSymbolLayerName,
+        #                     position = p,
+        #                     imageSettings = dict(
+        #                         name="rectangle",
+        #                         size=(self.sourceMarkerSize, self.sourceMarkerSize),
+        #                         fillColor=self.sourceStrokeColor
+        #                     ),
+        #                 )
+        #             sourceOnCurveSymbolLayer.setPosition(p)
+                        
+        
+    def updateInstanceOutline(self, rebuild=True):
+        # LongboardEditorView
+        # everything necessary to update the preview, time sensitive
+        
+        zooming = glyphEditorIsInZoom()
+        print("updateInstanceOutline rebuild", rebuild, zooming)
+
+        if self.darkMode != inDarkMode():
+            self.darkMode = not self.darkMode
+        if rebuild:
+            # this is set when we're constructing the instance preview
+            # for the first time. Clear out everything, rebuild everything
+            self.instancePathLayer.clearSublayers()
+            self.previewPathLayer.clearSublayers()
+            self.instanceMarkerLayer.clearSublayers()
+            self.marginsPathLayer.clearSublayers()
+            self.pointsPathLayer.clearSublayers()
 
         self.measurementMarkerLayer.clearSublayers()
         self.measurementsIntersectionsLayer.clearSublayers()
@@ -1017,6 +1004,7 @@ class LongboardEditorView(Subscriber):
 
         ds = self.operator
         sourcePens = []
+        
             
         # # boldly assume a font is only in a single discrete location
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
@@ -1037,90 +1025,166 @@ class LongboardEditorView(Subscriber):
             
             previewGlyph = RGlyph()
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
+
             shift = 0
             if self.centerAllGlyphs:
                 xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = .5*editorGlyph.width-.5*previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
+
+            self.updateSourceVectors(previewGlyph, rebuild=rebuild)
+
             cpPreview = CollectorPen(glyphSet={})
             previewGlyph.draw(cpPreview)
             if self.showMeasurements:
                 self.drawMeasurements(editorGlyph,  shift, previewGlyph)
+
             if self.showPreview:
-                path = previewGlyph.getRepresentation("merz.CGPath")
                 # 01 stroke instance path in the editor layer
-                layer = self.instancePathLayer.appendPathSublayer(
-                    fillColor=None,
-                    strokeColor=self.instanceStrokeColor,
-                    strokeWidth=self.instanceStrokeWidth,
-                    strokeDash=self.sourceStrokeDash,
-                    strokeCap="round",
-                    )
-                layer.setPath(path)
+                # layer append or update? 12
+                path = previewGlyph.getRepresentation("merz.CGPath")
+                instanceLayerName = f'instance_outline_{editorGlyph.name}'
+                instanceLayer = self.instancePathLayer.getSublayer(instanceLayerName)
+                if instanceLayer is None:
+                    instanceLayer = self.instancePathLayer.appendPathSublayer(
+                        name = instanceLayerName,
+                        fillColor=None,
+                        strokeColor=self.instanceStrokeColor,
+                        strokeWidth=self.instanceStrokeWidth,
+                        strokeDash = self.instanceStrokeDash,
+                        strokeCap="round",
+                        )
+                instanceLayer.setPath(path)
                 
                 # set the path in the preview layer as well
-                layer = self.previewPathLayer.appendPathSublayer(
-                    strokeColor = self.previewStrokeColor,
-                    #strokeDash = self.previewStrokeDash,
-                    strokeWidth = 1,
-                    fillColor = None,
-                    )
-                layer.setPath(path)
-
+                # layer append or update? 13
+                previewLayerName = f'instance_preview_{editorGlyph.name}'
+                previewLayer = self.previewPathLayer.getSublayer(previewLayerName)
+                if previewLayer is None:
+                    previewLayer = self.previewPathLayer.appendPathSublayer(
+                        name = previewLayerName,
+                        strokeColor = self.previewStrokeColor,
+                        strokeDash = self.previewStrokeDash,
+                        strokeWidth = 1,
+                        fillColor = self.previewFillColor,
+                        )
+                previewLayer.setPath(path)
+                
                 if self.showPoints:
                     # 03 on curve markers on instance outline
-                    for m in cpPreview.onCurves:
-                        symbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(position=m)
-                        symbolLayer.setImageSettings(
-                            dict(
-                                name="oval",
-                                size=(self.markerSize, self.markerSize),
-                                fillColor=self.instanceStrokeColor
+                    for im, m in enumerate(cpPreview.onCurves):
+                        # layer append or update? 14 @@
+                        onCurveSymbolLayerName = f'preview_onCurve_{editorGlyph.name}_marker_{im}'
+                        onCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(onCurveSymbolLayerName)
+                        if onCurveSymbolLayer is None:
+                            onCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
+                                name=onCurveSymbolLayerName,
+                                #layer = self.instancePathLayer.getSublayer(layerName),
+                                imageSettings = dict(
+                                    name="oval", # name of the factory
+                                    size=(self.instanceMarkerSize, self.instanceMarkerSize),
+                                    fillColor=self.instanceStrokeColor
+                                    ),
                                 )
-                            )
+                        onCurveSymbolLayer.setPosition(m)
+                        
                     # 04 off curve markers on instance outline
-                    for m in cpPreview.offCurves:
-                        symbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(position=m)
-                        symbolLayer.setImageSettings(
-                            dict(
-                                name="oval",
-                                size=(self.markerSize, self.markerSize),
-                                fillColor=self.instanceStrokeColor
-                                )
+                    for im, m in enumerate(cpPreview.offCurves):
+                        # layer append or update? 15
+                        offCurveSymbolLayerName = f'preview_offCurve_{editorGlyph.name}_marker_{im}'
+                        offCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(offCurveSymbolLayerName)
+                        if offCurveSymbolLayer is None:
+                            offCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
+                                name=offCurveSymbolLayerName,
+                                imageSettings = dict(
+                                    name="oval",
+                                    size=(self.instanceMarkerSize, self.instanceMarkerSize),
+                                    fillColor=self.instanceStrokeColor
+                                ),
                             )
+                            
+                        offCurveSymbolLayer.setPosition(m)
+
                     # 05 draw small lines for the left and right margins of the instance outline
                     #@@
                     # show the margin lines at the expected angle
                     italicSlantOffset = editorGlyph.font.lib.get(self.italicSlantOffsetKey, 0)
-                    a = editorGlyph.font.info.italicAngle
-                    if a is None:
-                        a = 0
-                    angle = math.radians(90+a)
+                    angle = editorGlyph.font.info.italicAngle
+                    if angle is None:
+                        angle = 0
+                    angle = math.radians(90+angle)
                     dx = math.cos(angle) * self.marginLineHeight
                     a = (shift-dx+italicSlantOffset, -self.marginLineHeight)
                     b = (shift+italicSlantOffset, 0)
                     shiftRight = .5*editorGlyph.width +.5*previewGlyph.width
                     c = (shiftRight-dx+italicSlantOffset, -self.marginLineHeight)
                     d = (shiftRight+italicSlantOffset, 0)
-                    leftMargin = self.marginsPathLayer.appendLineSublayer(
-                        startPoint=a,
-                        endPoint=b,
-                        strokeColor=self.vectorStrokeColor,
-                        strokeWidth=2, #self.instanceStrokeWidth,
-                        fillColor = None,
-                        strokeDash= self.vectorStrokeDash,
-                        strokeCap="round",
-                    )
-                    rightMargin = self.marginsPathLayer.appendLineSublayer(
-                        startPoint=c,
-                        endPoint=d,
-                        strokeColor=self.vectorStrokeColor,
-                        strokeWidth= 2,    #self.instanceStrokeWidth,
-                        fillColor = None,
-                        strokeDash=self.vectorStrokeDash,
-                        strokeCap="round",
-                    )
+                    # layer append or update? 16
+                    
+                    marginLayerName = f'instance_{editorGlyph.name}_margins'
+                    marginLayer = self.marginsPathLayer.getSublayer(marginLayerName)
+                    if marginLayer is None:
+                        marginLayer = self.marginsPathLayer.appendPathSublayer(
+                            strokeColor = self.vectorStrokeColor,
+                            strokeDash = self.previewStrokeDash,
+                            strokeWidth = 1,
+                            fillColor = None,
+                        )
+                    marginLinePath = merz.MerzPen()
+                    marginLinePath.moveTo(a)
+                    marginLinePath.lineTo(b)
+                    marginLinePath.endPath()
+                    marginLinePath.moveTo(c)
+                    marginLinePath.lineTo(d)
+                    marginLinePath.endPath()
+                    marginLayer.setPath(marginLinePath.path)
 
+                    leftMarginLayerName = f'instance_{editorGlyph.name}_leftMargin'
+                    leftMarginLayer = self.marginsPathLayer.getSublayer(leftMarginLayerName)
+                    if leftMarginLayer is None:
+                        leftMarginLayer = self.marginsPathLayer.appendLineSublayer(
+                            name=leftMarginLayerName,
+                            #startPoint=a,
+                            #endPoint=b,
+                            strokeColor=self.vectorStrokeColor,
+                            strokeWidth= self.instanceStrokeWidth,
+                            fillColor = None,
+                            strokeDash= self.vectorStrokeDash,
+                            strokeCap="round",
+                        )
+                    leftMarginLayer.setStartPoint(a)
+                    leftMarginLayer.setEndPoint(b)
+
+                    # layer append or update? 17
+                    rightMarginLayerName = f'instance_{editorGlyph.name}_rightMargin'
+                    rightMarginLayer = self.marginsPathLayer.getSublayer(rightMarginLayerName)
+                    if rightMarginLayer is None:
+                        rightMarginLayer = self.marginsPathLayer.appendLineSublayer(
+                            name=rightMarginLayerName,
+                            startPoint=c,
+                            endPoint=d,
+                            strokeColor=self.vectorStrokeColor,
+                            strokeWidth=  self.instanceStrokeWidth,
+                            fillColor = None,
+                            strokeDash=self.vectorStrokeDash,
+                            strokeCap="round",
+                        )
+                    rightMarginLayer.setStartPoint(c)
+                    rightMarginLayer.setEndPoint(d)
+
+    def updateSourceVectors(self, previewGlyph, rebuild=True):
+        collectorPen = CollectorPen({})
+        previewGlyph.draw(collectorPen)
+        if self.showPoints:
+            # draw the oncurve point vectors
+            vectorPath = merz.MerzPen()
+            for sourcePenIndex, s in enumerate(self.sourcePens) :
+                for vectorIndex, vector in enumerate(zip(collectorPen.onCurves, s.onCurves)):
+                    a, b = vector
+                    vectorPath.moveTo(a)
+                    vectorPath.lineTo(b)
+                    vectorPath.endPath()
+            self.pointsPathLayer.setPath(vectorPath.path)                    
                 
     def showSettingsChanged(self, info):
         # LongboardEditorView
@@ -1137,8 +1201,8 @@ class LongboardEditorView(Subscriber):
         if info["longBoardHazeFactor"] is not None:
             self.longBoardHazeFactor = info["longBoardHazeFactor"]
         self.setPreferences()
-        self.updateSourcesOutlines()
-        self.updateInstanceOutline()
+        self.updateSourcesOutlines(rebuild=True)
+        self.updateInstanceOutline(rebuild=True)
 
 def uiSettingsExtractor(subscriber, info):
     # crikey there as to be a more efficient way to do this.
