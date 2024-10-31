@@ -52,7 +52,7 @@ settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "0.4.4"
+longBoardVersion = "0.4.5"
 
 
 from mojo.events import (
@@ -135,7 +135,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         content = """
         NOOP @currentOperator
                 
-        | ----------------- | @table
+        | ----------------- | @axesTable
+        | xx | tf | pu | av |
+        | ----------------- |
+
+        | ----------------- | @locationTable
         | xx | tf | pu | av |
         | ----------------- |
 
@@ -148,33 +152,32 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> (Reset Current Location) @resetPreview
         
         > * VerticalStack @column2
-        >> [X] Show Preview @showPreview
+        #>> [X] Show Preview @showPreview
         >> [ ] Show Sources @showSources
         >> [ ] Show Vectors @showPoints
         >> [X] Show Measurements @showMeasurements
-        >> [X] Allow Extrapolation @allowExtrapolation
+        >> [ ] Allow Extrapolation @allowExtrapolation
 
         >> Preview Transparency
         >> --X-- Haziness @hazeSlider
         """
         descriptionData = dict(
-            table=dict(
-                identifier="table",
-                height=120,
-                width=400,
+            axesTable=dict(
+                height=100,
+                width=500,
                 items = [],
                 columnDescriptions = [
                     dict(
                         identifier="textValue",
                         title="Axis",
-                        width=60,
+                        #width=60,
                         editable=True
                     ),
                     dict(
                         identifier="popUpValue",
-                        title="Direction",
+                        title="🔀",
                         editable=True,
-                        width=100,
+                        #width=100,
                         cellDescription=dict(
                             cellType="PopUpButton",
                             cellClassArguments=dict(
@@ -182,22 +185,52 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                             )
                         )
                     ),
-                    dict(
-                        identifier="axisWarning",
-                        title="",
-                        width=20,
-                        editable=False
-                    ),
+                    # dict(
+                    #     identifier="axisWarning",
+                    #     title="",
+                    #     width=20,
+                    #     editable=False
+                    # ),
                     dict(
                         identifier="axisValue",
                         title="Value",
-                        width=100,
-                        editable=True
+                        #width=100,
+                        editable=True,
+                        cellDescription=dict(
+                            attributes = dict(fillColor = (1,0,0, 1)),
+                        ),
                     ),
                 ],
             ),
+
+            locationTable=dict(
+                height=150,
+                width=500,
+                items = [],
+                columnDescriptions = [
+                    # dict(
+                    #     identifier="locationType",
+                    #     title="Type",
+                    #     #width=60,
+                    #     editable=False
+                    # ),
+                    dict(
+                        identifier="locationName",
+                        title="🏷️",
+                        width=190,
+                        editable=False
+                    ),
+                    dict(
+                        identifier="locationText",
+                        title="📍",
+                        width=190,
+                        editable=False
+                    ),
+                ],
+            ),
+
             currentOperator=dict(
-                text="No Designspace?"
+                text="Looking for Designspace and Current Glyph"
                 ),
             hazeSlider=dict(
                 minValue=0.08,
@@ -205,14 +238,15 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 value=0.5
                 ),
         )
-        self.w = ezui.EZPanel(
+        self.w = ezui.EZWindow(
             title=f"Longboard",
             content=content,
             descriptionData=descriptionData,
             controller=self,
-            size=(400, "auto")
+            size=(500, "auto")
         )
         self.operator = None
+        self.axisValueDigits = 3
     
     def locationToString(self, location):
         t = []
@@ -220,6 +254,16 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             t.append(f"{name}_{location[name]:3.2f}")
         return "_".join(t)
     
+    def designspaceEditorDidCloseDesignspace(self, info):
+        #print('designspaceEditorDidCloseDesignspace', info)
+        self.w.getItem("axesTable").set([])
+        self.w.getItem("locationTable").set([])
+        #@@
+        self.w.setItemValue("currentOperator", "Looking for Designspace and Current Glyph")
+        self.close()
+        #if self.operator is None: return
+        #if self.operator.path is None: return
+        
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
         # Why in longboard and not in DSE? Because it is more about evaluating the
@@ -292,18 +336,31 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             styleName = self.locationToString(currentLocation),
             )
         self.operator.changed()
-        
-    def tableEditCallback(self, sender):
+    
+    #def locationTableEditCallback(self, sender):
+    #    print('locationTableCallback', sender)
+
+    def locationTableSelectionCallback(self, sender):
+        #print('locationTableSelectionCallback', sender.getSelectedItems())
+        selectedLocations = sender.getSelectedItems()
+        first = selectedLocations[0]
+        firstLocation = first.get('locationDict')
+        if firstLocation is not None:
+            self.operator.setPreviewLocation(firstLocation)
+            self.operator.changed()
+                        
+    def axesTableEditCallback(self, sender):
+        #print('axesTableEditCallback', sender)
         # LongBoardUIController
         # callback for the interaction sources table
         # maybe it can have a less generic name than "tableEditCallback"
         # tableEditCallback [{'textValue': 'weight', 'popUpValue': 0}]
         prefs = []
         locationFromTable = {}
-        for axis in self.w.getItem("table").get():
+        for axis in self.w.getItem("axesTable").get():
             axisName = axis['textValue']
             try:
-                axisValue = float(str(axis['axisValue']))
+                axisValue = round(float(str(axis['axisValue'])), self.axisValueDigits)
             except ValueError:
                 axisValue = None
             if axisValue is not None:
@@ -315,14 +372,13 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             elif axis['popUpValue'] == 2:     # vertical
                 prefs.append((axisName, "ignore"))
         # where is the operatr coming from?
-        print("locationFromTable", locationFromTable)
+        #print("locationFromTable", locationFromTable)
         # can we broadcast this new location to the world?
         if self.operator is not None:
             self.operator.lib[interactionSourcesLibKey] = prefs
             currentPreviewLocation = self.operator.getPreviewLocation()
             currentPreviewLocation.update(locationFromTable)
             self.operator.setPreviewLocation(currentPreviewLocation)
-
             self.operator.changed()
         else:
             print("tableEditCallback pref not set, no operator", pref)
@@ -368,7 +424,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
 
         unit = {}
         unitScale = 100
-        for axis in self.w.getItem("table").get():
+        for axis in self.w.getItem("axesTable").get():
             name = axis['textValue']
             if axis['popUpValue'] == 0:     # horizontal
                 #unit[name] = unitScale/(data['horizontal'] / viewScale)
@@ -388,12 +444,19 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             editorObject.previewLocation_dragging = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
         # update the instance outline, but not a rebuild, just move the points
         editorObject.updateInstanceOutline(rebuild=False)
-        
+    
     def relevantOperatorChanged(self, info):
         # LongBoardUIController
         # @@ from https://robofont.com/documentation/reference/api/mojo/mojo-subscriber/#mojo.subscriber.registerSubscriberEvent
+        #print("relevantOperatorChanged", info)
         operator = info["lowLevelEvents"][0].get('operator')
-        if operator is None: return
+        glyph = info["lowLevelEvents"][0].get('glyph')
+        if operator is None:
+            print('No Operator found.')
+            return
+        glyphName = None
+        if glyph is not None:
+            glyphName = glyph.name
         currentLocation = operator.getPreviewLocation()
         # ask operator for the interaction sources stored in its lib
         if operator is not None:
@@ -415,7 +478,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                             axisWarning = ""
                         else:
                             axisWarning = "😨"
-                    items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=axisValue))
+                    items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=round(axisValue, self.axisValueDigits)))
             else:
                 v = 0
                 for axisObject in operator.getOrderedContinuousAxes():
@@ -433,11 +496,34 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     v = max(v, 2)
                 operator.lib[interactionSourcesLibKey] = prefs
                 operator.changed()
-            self.w.getItem("table").set(items)
+            self.w.getItem("axesTable").set(items)
+            # collect interesting locations here
+            interesting = []
+            for src in operator.sources:
+                loc = dict(
+                    #locationType="Source", 
+                    locationName = os.path.basename(src.path),
+                    locationText = operator.nameLocation(src.location),
+                    locationDict = src.location,
+                    )
+                interesting.append(loc)
+            for instance in operator.instances:
+                loc = dict(
+                    #locationType="Source", 
+                    locationName=f'{instance.familyName} {instance.styleName}',
+                    locationText = operator.nameLocation(instance.location),
+                    locationDict = instance.location,
+                    )
+                interesting.append(loc)
+            self.w.setItemValue("locationTable", interesting)
+            #
             self.operator = operator
             if operator.path is not None:
                 fileName = os.path.basename(operator.path)
-                self.w.setItemValue("currentOperator", f"Showing: {fileName}")
+                if glyphName is not None:
+                    self.w.setItemValue("currentOperator", f"Showing: {glyphName} from {fileName}")
+                else:
+                    self.w.setItemValue("currentOperator", f"Showing: {fileName}. No Glyph.")
             else:
                 self.w.setItemValue("currentOperator", f"Unsaved Designspace")
 
@@ -535,7 +621,7 @@ class LongboardEditorView(Subscriber):
         self.setPreferences()
         self.operator = None
         self.currentOperator = None
-        self.allowExtrapolation = True    # should we show extrapolation
+        self.allowExtrapolation = False    # should we show extrapolation
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showSources = False
@@ -1193,7 +1279,7 @@ class LongboardEditorView(Subscriber):
         self.setPreferences()
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
-        print("showSettingsChanged", self.showPoints)
+        #print("showSettingsChanged", self.showPoints)
 
 def uiSettingsExtractor(subscriber, info):
     # crikey there as to be a more efficient way to do this.
@@ -1237,7 +1323,7 @@ registerSubscriberEvent(
     methodName="relevantOperatorChanged",
     lowLevelEventNames=[operatorChangedEventKey],
     dispatcher="roboFont",
-    delay=.5,
+    delay=.25,
     documentation="This is sent when the glyph editor subscriber finds there is a new relevant designspace.",
     debug=True
 )
