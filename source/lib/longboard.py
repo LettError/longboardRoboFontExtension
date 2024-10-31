@@ -247,7 +247,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         extrapolateState = self.operator.extrapolate
         self.operator.useVarlib = False
         self.operator.extrapolate = True
-        self.operator.startDebug()
         try:
             font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         except:
@@ -380,9 +379,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             # and for ignore we don't pass anything
         extreme = []      
         for axisName, offset in unit.items():
-            value = editorObject.previewLocation_dragging[axisName]
-            value += .05 * offset
-            editorObject.previewLocation_dragging[axisName] = value
+            if axisName in editorObject.previewLocation_dragging:
+                value = editorObject.previewLocation_dragging[axisName]
+                value += .05 * offset
+                editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
             editorObject.previewLocation_dragging = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
