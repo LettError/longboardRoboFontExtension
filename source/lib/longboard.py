@@ -671,9 +671,7 @@ class LongboardEditorView(Subscriber):
             strokeDash=self.vectorStrokeDash,
             strokeCap="round",
         )
-        self.sourcesPathLayer = self.editorContainer.appendBaseSublayer()
         self.marginsPathLayer = self.editorContainer.appendBaseSublayer()
-        self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
         self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
         self.measurementsIntersectionsLayer = self.editorContainer.appendBaseSublayer()
         self.measurementMarkerLayer = self.editorContainer.appendBaseSublayer()
