@@ -52,7 +52,7 @@ settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "0.4.5"
+longBoardVersion = "1.1"
 
 
 from mojo.events import (
