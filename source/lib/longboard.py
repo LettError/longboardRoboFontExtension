@@ -4,6 +4,8 @@
     
     erik@letterror.com
     October 2024
+    
+    We Love Git
 """
 
 import importlib
@@ -12,6 +14,7 @@ importlib.reload(ufoProcessor.ufoOperator)
 import ezui
 import math, time, os, traceback
 import AppKit
+import webbrowser
 
 import merz
 
@@ -37,6 +40,8 @@ from fontTools.pens.basePen import BasePen
 from fontTools.ufoLib.glifLib import writeGlyphToString
 from fontTools.designspaceLib import InstanceDescriptor
 
+from datetime import datetime
+
 
 eventID = "com.letterror.longboardNavigator"
 navigatorLocationChangedEventKey = eventID + "navigatorLocationChanged.event"
@@ -48,11 +53,14 @@ toolID = "com.letterror.longboard"
 containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
 
+#KeyError:                 'com.letterror.longboard.settingsChanged.event'
+#settingsChangedEventKey     com.letterror.longboard.settingsChanged.event
+
 settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "1.1"
+longBoardVersion = "1.3"
 
 
 from mojo.events import (
@@ -133,51 +141,56 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def build(self):
         # LongBoardUIController
         content = """
-        NOOP @currentOperator
-                
         | ----------------- | @axesTable
         | xx | tf | pu | av |
         | ----------------- |
 
-        | ----------------- | @locationTable
-        | xx | tf | pu | av |
-        | ----------------- |
-
-        * HorizontalStack @stack
-        
-        > * VerticalStack @column1
+        --------
+        (interestingLocations ...) @interestingLocationsPopup
+         
+        --------
+        Tools
+         
+        * HorizontalStack @tools        
+        > * VerticalStack @toolsColumn1
         >> (Add New Instance) @addInstance
         >> (Make Preview UFO) @makePreviewUFO
         >> (Copy Glyph to Clipboard) @copyClipboard
-        >> (Reset Current Location) @resetPreview
+        > * VerticalStack @toolsColumn2
+        >> (Default Location) @resetPreview
+        >> (Random Location) @randomPreview
+        --------
+        Appearance
         
-        > * VerticalStack @column2
+        * HorizontalStack @appearance        
+        > * VerticalStack @appearanceColumn1
         #>> [X] Show Preview @showPreview
         >> [ ] Show Sources @showSources
         >> [ ] Show Vectors @showPoints
+        >> (X MutatorMath X| VarLib ) @mathModelButton
+        > * VerticalStack @appearanceColumn2
         >> [X] Show Measurements @showMeasurements
         >> [ ] Allow Extrapolation @allowExtrapolation
-
-        >> Preview Transparency
         >> --X-- Haziness @hazeSlider
+
+        --------
+        (⚙️LettError) @lettErrorButton
         """
         descriptionData = dict(
             axesTable=dict(
                 height=100,
-                width=500,
+                width=400,
                 items = [],
                 columnDescriptions = [
                     dict(
                         identifier="textValue",
                         title="Axis",
-                        #width=60,
                         editable=True
                     ),
                     dict(
                         identifier="popUpValue",
-                        title="🔀",
+                        title="Move",
                         editable=True,
-                        #width=100,
                         cellDescription=dict(
                             cellType="PopUpButton",
                             cellClassArguments=dict(
@@ -185,53 +198,14 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                             )
                         )
                     ),
-                    # dict(
-                    #     identifier="axisWarning",
-                    #     title="",
-                    #     width=20,
-                    #     editable=False
-                    # ),
                     dict(
                         identifier="axisValue",
-                        title="Value",
-                        #width=100,
+                        title="Axis Value",
                         editable=True,
-                        cellDescription=dict(
-                            attributes = dict(fillColor = (1,0,0, 1)),
-                        ),
                     ),
                 ],
             ),
 
-            locationTable=dict(
-                height=150,
-                width=500,
-                items = [],
-                columnDescriptions = [
-                    # dict(
-                    #     identifier="locationType",
-                    #     title="Type",
-                    #     #width=60,
-                    #     editable=False
-                    # ),
-                    dict(
-                        identifier="locationName",
-                        title="🏷️",
-                        width=190,
-                        editable=False
-                    ),
-                    dict(
-                        identifier="locationText",
-                        title="📍",
-                        width=190,
-                        editable=False
-                    ),
-                ],
-            ),
-
-            currentOperator=dict(
-                text="Looking for Designspace and Current Glyph"
-                ),
             hazeSlider=dict(
                 minValue=0.08,
                 maxValue=0.8,
@@ -239,15 +213,36 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 ),
         )
         self.w = ezui.EZWindow(
-            title=f"Longboard",
+            title= f"🛹 v{longBoardVersion}",
             content=content,
             descriptionData=descriptionData,
             controller=self,
-            size=(500, "auto")
+            size=(400, "auto")
         )
         self.operator = None
         self.axisValueDigits = 3
+        self.interestingLocations = []    # list of the locations stored in the popup;
+        self.enableActionButtons(False)
+        self.wantsVarLib = False
     
+    def enableActionButtons(self, state):
+        # enable or disable the action buttons
+        self.w.getItem("addInstance").enable(state)
+        self.w.getItem("makePreviewUFO").enable(state)
+        self.w.getItem("copyClipboard").enable(state)
+        self.w.getItem("makePreviewUFO").enable(state)
+        self.w.getItem("resetPreview").enable(state)
+        self.w.getItem("randomPreview").enable(state)
+        self.w.getItem("interestingLocationsPopup").enable(state)
+        self.w.getItem("mathModelButton").enable(state)
+
+        #self.w.getItem("showPreview").enable(state)
+        #self.w.getItem("showSources").enable(state)
+        #self.w.getItem("showPoints").enable(state)
+        #self.w.getItem("showMeasurements").enable(state)
+        #self.w.getItem("allowExtrapolation").enable(state)
+        #self.w.getItem("hazeSlider").enable(state)
+        
     def locationToString(self, location):
         t = []
         for name in sorted(location.keys()):
@@ -255,14 +250,13 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         return "_".join(t)
     
     def designspaceEditorDidCloseDesignspace(self, info):
-        #print('designspaceEditorDidCloseDesignspace', info)
         self.w.getItem("axesTable").set([])
-        self.w.getItem("locationTable").set([])
-        #@@
-        self.w.setItemValue("currentOperator", "Looking for Designspace and Current Glyph")
-        self.close()
-        #if self.operator is None: return
-        #if self.operator.path is None: return
+        self.w.setTitle("🛹")
+        self.enableActionButtons(False)
+    
+    def lettErrorButtonCallback(self, sender):
+        # open the LettError GitHub sponsor page because it would be nice.
+        webbrowser.open("https://github.com/letterror")    #https://letterror.com
         
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
@@ -281,7 +275,15 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         instanceDescriptor.familyName = defaultFont.info.familyName
         instanceDescriptor.styleName = self.locationToString(currentPreviewLocation)
         instanceDescriptor.location = currentPreviewLocation
-        ufoName = f"Preview_{instanceDescriptor.familyName}-{instanceDescriptor.styleName}_{ufoNameMathTag}.ufo"
+        # 
+        now = datetime.now() # current date and time
+        date = now.strftime("%Y-%m-%d-%H-%M-%S")
+        # location
+        locationString = self.operator.locationToDescriptiveString(currentPreviewLocation)
+        # fileName
+        operatorFileName = self.getOperatorFileName(self.operator)
+
+        ufoName = f"Preview_{instanceDescriptor.familyName}-{instanceDescriptor.styleName}_{ufoNameMathTag}_{date}.ufo"
         docFolder = os.path.dirname(self.operator.path)
         previewFolder = os.path.join(docFolder, self.previewsFolderName)
         if not os.path.exists(previewFolder):
@@ -294,41 +296,73 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         try:
             font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         except:
-            print("Something went wrong making the preview, sorry.")
+            self.showMessage("LongBoard can not make the preview UFO.", informativeText="I'm printing the traceback in the Output.")
+            print(f"LongBoard {longboardVersion} reports:")
             print(traceback.format_exc())
             return
-        #print('done generating')
         self.operator.useVarlib = useVarlibState
         self.operator.extrapolate = extrapolateState
+        
+        if self.operator.useVarlib:
+            model = "VarLib"
+        else:
+            model = "MutatorMath"
+        font.info.note = f"Preview UFO generated by LongBoard {longBoardVersion}, using {model}, from designspace {operatorFileName} at coordinates {locationString}, on date {date}."
         font.save(ufoPath)
         font.close()
         OpenFont(ufoPath, showInterface=True)
-        
+
+    def mathModelButtonCallback(self, sender):
+        # switch to the preferred math model for the previews
+        # 0: calculate preview with MutatorMath
+        # 1: calculate preview with VarLib
+        if sender.get() == 0:
+            self.wantsVarLib = False
+        else:
+            self.wantsVarLib = True
+        # LongBoardUIController
+        postEvent(settingsChangedEventKey, wantsVarLib=self.wantsVarLib)
+            
     def copyClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
         currentPreviewLocation = self.operator.getPreviewLocation()
         glyph = CurrentGlyph()
         if glyph is None: return
         name = glyph.name
-        mathGlyph = self.operator.makeOneGlyph(name, location=currentPreviewLocation)
+        mathGlyph = self.operator.makeOneGlyph(name, location=currentPreviewLocation, useVarlib=self.wantsVarLib)
         if mathGlyph is not None:
             clipboardGlyph = RGlyph()
             mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
             clipboardGlyph.copyToPasteboard()
 
-    def resetPreviewCallback(self, sender):
+    def resetPreviewCallback(self, sender=None):
+        # set the preview location to the default.
         currentPreviewLocation = self.operator.getPreviewLocation()
         currentPreviewContinuous, currentPreviewDiscrete = self.operator.splitLocation(currentPreviewLocation)
         defaultLocation = self.operator.newDefaultLocation(discreteLocation=currentPreviewDiscrete)
         self.operator.setPreviewLocation(defaultLocation)
         self.operator.changed()
+    
+    def randomPreviewCallback(self, sender):
+        # set the preview location to a random value.
+        # extrapolate a bit if allowExtrapolation is checked.
+        if self.w.getItem("allowExtrapolation").get() == 1:
+            extra = 0.2
+        else:
+            extra = 0
+        randomLocation = self.operator.randomLocation(extrapolate=extra)
+        self.operator.setPreviewLocation(randomLocation)
+        self.operator.changed()
         
     def addInstanceCallback(self, sender):
+        # add an instance to the current designspace.
         currentLocation = self.operator.getPreviewLocation()
+        if currentLocation is None: return
         # first check if this location already has an instance
         for instance in self.operator.instances:
+            if instance.location is None: continue
             if currentLocation == instance.location:
-                print(f"instance at {currentLocation} exists, cancelling")
+                self.showMessage("Longboard can not add instance:", informativeText=f'Designspace already has an instance at this location.', alertStyle='informational', )
                 return
         # then add the instance
         self.operator.addInstanceDescriptor(
@@ -336,21 +370,18 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             styleName = self.locationToString(currentLocation),
             )
         self.operator.changed()
-    
-    #def locationTableEditCallback(self, sender):
-    #    print('locationTableCallback', sender)
 
-    def locationTableSelectionCallback(self, sender):
-        #print('locationTableSelectionCallback', sender.getSelectedItems())
-        selectedLocations = sender.getSelectedItems()
-        first = selectedLocations[0]
-        firstLocation = first.get('locationDict')
-        if firstLocation is not None:
-            self.operator.setPreviewLocation(firstLocation)
-            self.operator.changed()
-                        
+    def interestingLocationsPopupCallback(self, sender):
+        selectedIndex = sender.get()    # skip the first item, it is text
+        if selectedIndex == 0:
+            # it is the placeholder text. Don't change anything
+            return
+        selectedIndex = selectedIndex - 1
+        selectionLocation = self.interestingLocations[selectedIndex]
+        self.operator.setPreviewLocation(selectionLocation)
+        self.operator.changed()
+        
     def axesTableEditCallback(self, sender):
-        #print('axesTableEditCallback', sender)
         # LongBoardUIController
         # callback for the interaction sources table
         # maybe it can have a less generic name than "tableEditCallback"
@@ -372,7 +403,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             elif axis['popUpValue'] == 2:     # vertical
                 prefs.append((axisName, "ignore"))
         # where is the operatr coming from?
-        #print("locationFromTable", locationFromTable)
         # can we broadcast this new location to the world?
         if self.operator is not None:
             self.operator.lib[interactionSourcesLibKey] = prefs
@@ -380,8 +410,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             currentPreviewLocation.update(locationFromTable)
             self.operator.setPreviewLocation(currentPreviewLocation)
             self.operator.changed()
-        else:
-            print("tableEditCallback pref not set, no operator", pref)
         
     def started(self):
         # LongBoardUIController
@@ -391,21 +419,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def destroy(self):
         # LongBoardUIController
         unregisterGlyphEditorSubscriber(LongboardEditorView)
-
-    def checkAxisValueInExtremes(self, operator, axisName, axisValue):
-        # check if the axis Value for axis name is in between minimum and maximum
-        for axisRecord in operator.axes:
-            if axisRecord.name == axisName:
-                aD_minimum, aD_default, aD_maximum =  operator.getAxisExtremes(axisRecord)
-                if aD_minimum <= axisValue <= aD_maximum:
-                    return True
-        return False
         
     def navigatorLocationChanged(self, info):
         # LongBoardUIController
         # receive notifications about the navigator location changing.
         # scale mouse movement to "increment units"
-        # operatpr has the axes data
+        # operator has the axes data
         # glypheditor has the viewscale
         # UI has the axis masks
         # sort extrapolation here?
@@ -419,8 +438,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         nav = data['horizontal'], data['vertical']
 
         # @@_mouse_drag_updating_data
-        # the
         editorObject = data['editor']
+        #print(f"navigatorLocationChanged operator {os.path.basename(self.operator.path)}")
+        #print(f"navigatorLocationChanged editorObject {editorObject}")
 
         unit = {}
         unitScale = 100
@@ -437,96 +457,107 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
                 value = editorObject.previewLocation_dragging[axisName]
-                value += .05 * offset
+                value += .025 * offset    # subjective value! 
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
+        #print("preview clipping navigatorLocationChanged", self.w.getItem("allowExtrapolation").get())
         if self.w.getItem("allowExtrapolation").get() == 0:
-            editorObject.previewLocation_dragging = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
+            # AttributeError: 'NoneType' object has no attribute 'map_forward'
+            try:
+                clipped = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
+            except AttributeError:
+                clipped = editorObject.previewLocation_dragging
+            editorObject.previewLocation_dragging = clipped
         # update the instance outline, but not a rebuild, just move the points
         editorObject.updateInstanceOutline(rebuild=False)
     
+    def getOperatorFileName(self, operator):
+        if operator.path is None:
+            return "Unsaved"
+        fileName = os.path.basename(operator.path)
+        fileName = os.path.splitext(fileName)[0]
+        return fileName
+
     def relevantOperatorChanged(self, info):
         # LongBoardUIController
         # @@ from https://robofont.com/documentation/reference/api/mojo/mojo-subscriber/#mojo.subscriber.registerSubscriberEvent
-        #print("relevantOperatorChanged", info)
-        operator = info["lowLevelEvents"][0].get('operator')
+        self.operator = info["lowLevelEvents"][0].get('operator')
+        operatorFileName = self.getOperatorFileName(self.operator)
         glyph = info["lowLevelEvents"][0].get('glyph')
-        if operator is None:
-            print('No Operator found.')
+        #print('relevantOperatorChanged', info["lowLevelEvents"][0])
+        #print(f'relevantOperatorChanged {self.operator}')
+        if self.operator is None:
+            self.showMessage("No designspace?", informativeText=f'Open a designspace in DesignspaceEdit', alertStyle='informational', )
+            self.enableActionButtons(False)
             return
+        
+        #print(f"relevantOperatorChanged checking mathmodel preference: {self.operator.useVarlib}")
         glyphName = None
         if glyph is not None:
+            self.enableActionButtons(True)
             glyphName = glyph.name
-        currentLocation = operator.getPreviewLocation()
-        # ask operator for the interaction sources stored in its lib
-        if operator is not None:
-            items = []
-            prefs = []
-            interactionSourcesPref = operator.lib.get(interactionSourcesLibKey)
-            #interactionSourcesPref = None    # reset prefs
-            if interactionSourcesPref is not None:
-                for axisName, interaction in interactionSourcesPref:
-                    v = 2
-                    if interaction == "horizontal":
-                        v = 0
-                    elif interaction == "vertical":
-                        v = 1
-                    axisValue = currentLocation.get(axisName, '-')
-                    axisWarning = ""
-                    if axisValue is not None and axisValue != "-":
-                        if self.checkAxisValueInExtremes(operator, axisName, axisValue):
-                            axisWarning = ""
-                        else:
-                            axisWarning = "😨"
-                    items.append(dict(textValue=axisName, popUpValue=v, axisWarning=axisWarning, axisValue=round(axisValue, self.axisValueDigits)))
-            else:
-                v = 0
-                for axisObject in operator.getOrderedContinuousAxes():
-                    axisValue = currentLocation.get(axisObject.name)
-                    axisValue = "-"
-                    axisWarning = ""
-                    items.append(dict(textValue=axisObject.name, popUpValue=v, axisWarning=axisWarning, axisValue='-'))
-                    if v == 0:
-                        prefs.append((axisObject.name, "horizontal"))
-                    elif v == 1:
-                        prefs.append((axisObject.name, "vertical"))
-                    elif v == 2:
-                        prefs.append((axisObject.name, "ignore"))
-                    v += 1
-                    v = max(v, 2)
-                operator.lib[interactionSourcesLibKey] = prefs
-                operator.changed()
-            self.w.getItem("axesTable").set(items)
-            # collect interesting locations here
-            interesting = []
-            for src in operator.sources:
-                loc = dict(
-                    #locationType="Source", 
-                    locationName = os.path.basename(src.path),
-                    locationText = operator.nameLocation(src.location),
-                    locationDict = src.location,
-                    )
-                interesting.append(loc)
-            for instance in operator.instances:
-                loc = dict(
-                    #locationType="Source", 
-                    locationName=f'{instance.familyName} {instance.styleName}',
-                    locationText = operator.nameLocation(instance.location),
-                    locationDict = instance.location,
-                    )
-                interesting.append(loc)
-            self.w.setItemValue("locationTable", interesting)
-            #
-            self.operator = operator
-            if operator.path is not None:
-                fileName = os.path.basename(operator.path)
-                if glyphName is not None:
-                    self.w.setItemValue("currentOperator", f"Showing: {glyphName} from {fileName}")
-                else:
-                    self.w.setItemValue("currentOperator", f"Showing: {fileName}. No Glyph.")
-            else:
-                self.w.setItemValue("currentOperator", f"Unsaved Designspace")
+        currentLocation = self.operator.getPreviewLocation()
+        if not currentLocation:
+            # the operator can return an empty location.
+            # let's reset it to the default location for this designspace and try again.
+            self.resetPreviewCallback()
+            return
 
+        # ask operator for the interaction sources stored in its lib
+        items = []
+        prefs = []
+        interactionSourcesPref = self.operator.lib.get(interactionSourcesLibKey)
+        #interactionSourcesPref = None    # reset prefs
+        if interactionSourcesPref is not None:
+            for axisName, interaction in interactionSourcesPref:
+                v = 2
+                if interaction == "horizontal":
+                    v = 0
+                elif interaction == "vertical":
+                    v = 1
+                if not axisName in currentLocation:
+                    #print(f"relevantOperatorChanged 4 {axisName} not in {currentLocation}")
+                    axisValue = "-"
+                else:
+                    axisValue = round(currentLocation[axisName], self.axisValueDigits)
+                items.append(dict(textValue=axisName, popUpValue=v, axisValue=axisValue))
+        else:
+            v = 0
+            for axisObject in self.operator.getOrderedContinuousAxes():
+                axisValue = currentLocation.get(axisObject.name)
+                axisValue = "-"
+                axisWarning = ""
+                items.append(dict(textValue=axisObject.name, popUpValue=v, axisWarning=axisWarning, axisValue='-'))
+                if v == 0:
+                    prefs.append((axisObject.name, "horizontal"))
+                elif v == 1:
+                    prefs.append((axisObject.name, "vertical"))
+                elif v == 2:
+                    prefs.append((axisObject.name, "ignore"))
+                v += 1
+                v = max(v, 2)
+            self.operator.lib[interactionSourcesLibKey] = prefs
+            self.operator.changed()
+        self.w.getItem("axesTable").set(items)
+        #collect interesting locations here
+        self.interestingLocations = []
+        interestingLocationsKeys = [f"Interesting Locations in {operatorFileName}…"]    # the names for the menu
+        for src in self.operator.sources:
+            if src.location is not None:
+                interestingLocationsKeys.append(f"Source {os.path.basename(src.path)}")
+                self.interestingLocations.append(src.location)
+        for instance in self.operator.instances:
+            if instance.location is not None:
+                interestingLocationsKeys.append(f'Instance {instance.familyName} {instance.styleName}')
+                self.interestingLocations.append(instance.location)
+        self.w.getItem("interestingLocationsPopup").setItems(interestingLocationsKeys)
+        self.w.getItem("interestingLocationsPopup").set(0)
+        if self.operator.path is not None:
+            if glyphName is not None:
+                self.w.setTitle(f"🛹 {operatorFileName} {glyphName}")
+            else:
+                self.w.setTitle(f"🛹 {operatorFileName}")
+    
     def showPreviewCallback(self, sender):
         # LongBoardUIController
         value = sender.get()
@@ -545,7 +576,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def allowExtrapolationCallback(self, sender):
         # LongBoardUIController
         value = sender.get()
-        postEvent(settingsChangedEventKey, extrapolate=value)
+        postEvent(settingsChangedEventKey, allowExtrapolation=value)
         
     def showMeasurementsCallback(self, sender):
         # LongBoardUIController
@@ -580,19 +611,19 @@ class LongboardEditorView(Subscriber):
             haze = 1
         else:
             haze = self.longBoardHazeFactor
-        #print('setColors', active)
         if self.darkMode:
             fillModel = (.5,.5,.5, .8*haze)
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
-            self.measurementStrokeColor = (0, 1, 1, haze)
-            self.measurementFillColor = (0, 1, 1, haze)
+            self.measurementStrokeColor = (0, 1, 1, 1)
+            self.measurementFillColor = (0, 1, 1, 1)
         else:
-            fillModel = (.5,.5,.5, previewHaze)
+            haze = 1 - self.longBoardHazeFactor
+            fillModel = (.5,.5,.5, haze)
             strokeModel = (0,0,0,haze)
-            vectorModel = (.8,.8,.8, previewHaze)
-            self.measurementStrokeColor = (0, .25, .5, haze)
-            self.measurementFillColor = (0, .25, .5, haze)
+            vectorModel = (.2,.2,.2, haze)
+            self.measurementStrokeColor = (0, .25, .5, 1)
+            self.measurementFillColor = (0, .25, .5, 1)
         self.sourceStrokeColor = vectorModel
         self.instanceStrokeColor = strokeModel
         self.vectorStrokeColor = vectorModel
@@ -602,13 +633,14 @@ class LongboardEditorView(Subscriber):
     def setPreferences(self):
         # LongboardEditorView
         self.darkMode = inDarkMode()
-        self.measurementMarkerSize = 2
+        self.measurementMarkerSize = 4
         self.measurementStrokeWidth = 1
         self.measurementStrokeDash = (1, 3)
         self.previewStrokeDash = (4, 4)
         self.vectorStrokeDash = (2, 2)
         self.sourceStrokeDash = (1, 2)
         self.instanceStrokeDash = (5, 2)
+        self.instanceStrokeDashExtrapolate = (5, 7)
         self.instanceStrokeWidth = 1
         self.instanceMarkerSize = 4
         self.sourceMarkerSize = 3
@@ -624,6 +656,7 @@ class LongboardEditorView(Subscriber):
         self.allowExtrapolation = False    # should we show extrapolation
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
+        self.wantsVarLib = False
         self.showSources = False
         self.sourcePens = []
         self.sourceGlyphs = []
@@ -641,6 +674,7 @@ class LongboardEditorView(Subscriber):
         glyphEditor = self.getGlyphEditor()
         # container for all layers in the editor window
         self.editorContainer = glyphEditor.extensionContainer(containerKey, location="middleground")
+        self.measurementContainer = glyphEditor.extensionContainer(containerKey, location="foreground")
         # container for all layers in the preview window
         # note: different use of the word Preview
         self.previewContainer = glyphEditor.extensionContainer(previewContainerKey, location="preview")
@@ -671,12 +705,18 @@ class LongboardEditorView(Subscriber):
             strokeDash=self.vectorStrokeDash,
             strokeCap="round",
         )
-        self.marginsPathLayer = self.editorContainer.appendBaseSublayer()
+        self.marginsPathLayer = self.editorContainer.appendPathSublayer(
+            strokeColor=self.vectorStrokeColor,
+            strokeWidth=self.instanceStrokeWidth,
+            fillColor = None,
+            strokeDash=self.vectorStrokeDash,
+            strokeCap="round",
+        )
+        #self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
         self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
-        self.measurementsIntersectionsLayer = self.editorContainer.appendBaseSublayer()
-        self.measurementMarkerLayer = self.editorContainer.appendBaseSublayer()
-        self.measurementTextLayer = self.editorContainer.appendBaseSublayer()
-
+        self.measurementsIntersectionsLayer = self.measurementContainer.appendBaseSublayer()
+        self.measurementMarkerLayer = self.measurementContainer.appendBaseSublayer()
+        self.measurementTextLayer = self.measurementContainer.appendBaseSublayer()
 
     def glyphEditorWillShowPreview(self, info):
         self.preparePreview = True
@@ -689,8 +729,6 @@ class LongboardEditorView(Subscriber):
     def glyphEditorDidMouseDown(self, info):
         # LongboardEditorView
         # starting drag
-        #print('glyphEditorDidMouseDown')
-        ## @@ 
         if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
         self.dragging = True
         self.setColors(active=True)
@@ -710,8 +748,9 @@ class LongboardEditorView(Subscriber):
         self.setColors(active=False)
         self.navigatorToolPosition = None
         self._lastEventTime = None
-        self.updateInstanceOutline()
-        self.operator.setPreviewLocation(self.previewLocation_dragging)
+        if self.operator is not None:
+            self.updateInstanceOutline()
+            self.operator.setPreviewLocation(self.previewLocation_dragging)
         
     def glyphEditorDidMouseDrag(self, info):
         # LongboardEditorView
@@ -720,10 +759,6 @@ class LongboardEditorView(Subscriber):
         # Otherwise this could have gone straight to the UI.
         if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
         if not self.operator: return
-        
-        #zooming = glyphEditorIsInZoom()
-        #if zooming:
-        #    print('glyphEditorDidMouseDrag zooming')
 
         view = info["lowLevelEvents"][-1].get('view')
         viewScale = view.scale()
@@ -754,7 +789,6 @@ class LongboardEditorView(Subscriber):
                 'horizontal': self.navigatorToolProgress[0]/timeSinceLastEvent,
                 'vertical': self.navigatorToolProgress[1]/timeSinceLastEvent,
                 }
-
         publishEvent(navigatorLocationChangedEventKey, data=data)
 
     def relevantForThisEditor(self, info=None):
@@ -790,6 +824,7 @@ class LongboardEditorView(Subscriber):
         # LongboardEditorView
         self.editorContainer.clearSublayers()
         self.previewContainer.clearSublayers()
+        self.measurementContainer.clearSublayers()
         self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
@@ -820,6 +855,7 @@ class LongboardEditorView(Subscriber):
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
+    # Reference: more designspace subscriber events
     #    designspaceEditorSourcesDidAddSource
     #    designspaceEditorSourcesDidRemoveSource
     #    designspaceEditorSourcesDidChanged
@@ -838,6 +874,7 @@ class LongboardEditorView(Subscriber):
         self.updateInstanceOutline(rebuild=True)
 
     def checkExtrapolation(self, location):
+        # LongboardEditorView
         # check if the axis Value for axis name is in between minimum and maximum
         if self.operator is None: return False
         axes = {ar.name: ar for ar in self.operator.axes}
@@ -938,10 +975,10 @@ class LongboardEditorView(Subscriber):
                     )
                 measurementMarkerLayer.setPosition(mp2)
                 # draw the measurement distance text
-                textPos = .5*(mp1[0]+mp2[0])+needlex, .5*(mp1[1]+mp2[1])+needley
+                # .5 = halfway and that causes overlaps with the normal ruler values
+                textOffsetFactor = 0.52    # slightly further out, subjective value.
+                textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
                 dist = math.hypot(mp1[0]-mp2[0], mp1[1]-mp2[1])
-                #$$
-                # layer append or update? 4
                 measurementTextLayerName = f"measurementText_{editorGlyph.name}_{measurementIndex}_{i}"
                 measurementTextLayer = self.measurementTextLayer.getSublayer(measurementTextLayerName)
                 if measurementTextLayer is None:
@@ -952,7 +989,7 @@ class LongboardEditorView(Subscriber):
                         fillColor=self.measurementFillColor,
                         horizontalAlignment="center",
                         )
-                measurementTextLayer.setText(f"{dist:3.2f}")
+                measurementTextLayer.setText(f"{dist:3.1f}")
                 measurementTextLayer.setPosition(textPos)
     
     def prepareSourcesOutlines(self, rebuild=True):
@@ -979,7 +1016,6 @@ class LongboardEditorView(Subscriber):
             sourcePen = CollectorPen(glyphSet={})
             # do not draw the master we're drawing in
             # 
-            #if loc==continuousLocationForCurrentSource: continue
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
             if self.centerAllGlyphs:
@@ -992,65 +1028,24 @@ class LongboardEditorView(Subscriber):
             self.sourceGlyphs.append(sourceGlyph)
 
     def updateSourcesOutlines(self, rebuild=True):
+        # draw the previously collected source outlines to a single merz path
         if self.operator is None:
             return
-
-        #zooming = glyphEditorIsInZoom()
-        #print("updateSourcesOutlines rebuild", rebuild, zooming)
-        # LongboardEditorView
-        # everything necessary to update the sources, not time sensitive
-
         self.prepareSourcesOutlines(rebuild=rebuild)
-
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
         if rebuild:
-            self.sourcesPathLayer.clearSublayers()
-            self.sourcesMarkerLayer.clearSublayers()
-
+            self.sourcesPathLayer.setPath(None)
+        # merzpen
+        sourcePen = merz.MerzPen()
         if self.showSources:
             for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
-                sourceGlyphsLayerName = f"sourceGlyphPath_{sourceGlyphIndex}"
-                sourceGlyphsLayer = self.sourcesPathLayer.getSublayer(sourceGlyphsLayerName)
-                if sourceGlyphsLayer is None:
-                    # layer append or update? 5
-                    sourceGlyphsLayer = self.sourcesPathLayer.appendPathSublayer(
-                        name=sourceGlyphsLayerName,
-                        fillColor=None,
-                        strokeColor=self.sourceStrokeColor,
-                        strokeWidth=self.instanceStrokeWidth,
-                        strokeDash=self.sourceStrokeDash,
-                        strokeCap="round",
-                        )
-                sourceGlyphsLayer.setPath(sourceGlyph.getRepresentation("merz.CGPath"))
-
-        # if self.showPoints:
-        #     # show the on curve point vectors
-        #     for sourcePenIndex, sourcePen in enumerate(self.sourcePens):
-        #         for sourceOnCurveIndex, p in enumerate(sourcePen.onCurves):
-        #             isStart = p in sourcePen.startPoints
-        #             # layer append or update? 10
-        #             sourceOnCurveSymbolLayerName = f"source_marker_{sourcePenIndex}_{sourceOnCurveIndex}"
-        #             sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.getSublayer(sourceOnCurveSymbolLayerName)
-        #             if sourceOnCurveSymbolLayer is None:
-        #                 sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(
-        #                     name = sourceOnCurveSymbolLayerName,
-        #                     position = p,
-        #                     imageSettings = dict(
-        #                         name="rectangle",
-        #                         size=(self.sourceMarkerSize, self.sourceMarkerSize),
-        #                         fillColor=self.sourceStrokeColor
-        #                     ),
-        #                 )
-        #             sourceOnCurveSymbolLayer.setPosition(p)
-                        
+                sourceGlyph.draw(sourcePen)
+            self.sourcesPathLayer.setPath(sourcePen.path)
         
     def updateInstanceOutline(self, rebuild=True):
         # LongboardEditorView
         # everything necessary to update the preview, time sensitive
-        
-        #zooming = glyphEditorIsInZoom()
-        #print("updateInstanceOutline rebuild", rebuild, zooming)
 
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
@@ -1060,7 +1055,7 @@ class LongboardEditorView(Subscriber):
             self.instancePathLayer.clearSublayers()
             self.previewPathLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
-            self.marginsPathLayer.clearSublayers()
+            self.marginsPathLayer.setPath(None)
             self.pointsPathLayer.setPath(None)
 
         self.measurementMarkerLayer.clearSublayers()
@@ -1077,7 +1072,6 @@ class LongboardEditorView(Subscriber):
 
         ds = self.operator
         sourcePens = []
-        
             
         # # boldly assume a font is only in a single discrete location
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
@@ -1091,7 +1085,7 @@ class LongboardEditorView(Subscriber):
                 discreteLocationForCurrentSource = dl[0]
 
         if self.previewLocation_dragging is not None:
-            mathGlyph = ds.makeOneGlyph(editorGlyph.name, location=self.previewLocation_dragging)
+            mathGlyph = ds.makeOneGlyph(editorGlyph.name, location=self.previewLocation_dragging, useVarlib=self.wantsVarLib)
             if editorGlyph is None or mathGlyph is None:
                 path = None
                 return
@@ -1119,16 +1113,23 @@ class LongboardEditorView(Subscriber):
                 path = previewGlyph.getRepresentation("merz.CGPath")
                 instanceLayerName = f'instance_outline_{editorGlyph.name}'
                 instanceLayer = self.instancePathLayer.getSublayer(instanceLayerName)
+                instanceStrokeDash = self.instanceStrokeDash
                 if instanceLayer is None:
                     instanceLayer = self.instancePathLayer.appendPathSublayer(
                         name = instanceLayerName,
                         fillColor=None,
                         strokeColor=self.instanceStrokeColor,
                         strokeWidth=self.instanceStrokeWidth,
-                        strokeDash = self.instanceStrokeDash,
+                        strokeDash = instanceStrokeDash,
                         strokeCap="round",
                         )
                 instanceLayer.setPath(path)
+                if self.checkExtrapolation(self.previewLocation_dragging):
+                    # we're outside the axis extremes, make the preview outline more stipply
+                    # we don't have to rebuild the whole path, just change the strokeDash attr.
+                    instanceStrokeDash = self.instanceStrokeDashExtrapolate
+                # but then we do need to set it each time.
+                instanceLayer.setStrokeDash(instanceStrokeDash)
                 
                 # set the path in the preview layer as well
                 # layer append or update? 13
@@ -1196,15 +1197,15 @@ class LongboardEditorView(Subscriber):
                     # layer append or update? 16
                     
                     marginLayerName = f'instance_{editorGlyph.name}_margins'
-                    marginLayer = self.marginsPathLayer.getSublayer(marginLayerName)
-                    if marginLayer is None:
-                        marginLayer = self.marginsPathLayer.appendPathSublayer(
-                            name = marginLayerName,
-                            strokeColor = self.vectorStrokeColor,
-                            strokeDash = self.previewStrokeDash,
-                            strokeWidth = 1,
-                            fillColor = None,
-                        )
+                    # marginLayer = self.marginsPathLayer.getSublayer(marginLayerName)
+                    # if marginLayer is None:
+                    #     marginLayer = self.marginsPathLayer.appendPathSublayer(
+                    #         name = marginLayerName,
+                    #         strokeColor = self.vectorStrokeColor,
+                    #         strokeDash = self.previewStrokeDash,
+                    #         strokeWidth = 1,
+                    #         fillColor = None,
+                    #     )
                     marginLinePath = merz.MerzPen()
                     marginLinePath.moveTo(a)
                     marginLinePath.lineTo(b)
@@ -1212,40 +1213,40 @@ class LongboardEditorView(Subscriber):
                     marginLinePath.moveTo(c)
                     marginLinePath.lineTo(d)
                     marginLinePath.endPath()
-                    marginLayer.setPath(marginLinePath.path)
+                    self.marginsPathLayer.setPath(marginLinePath.path)
 
-                    leftMarginLayerName = f'instance_{editorGlyph.name}_leftMargin'
-                    leftMarginLayer = self.marginsPathLayer.getSublayer(leftMarginLayerName)
-                    if leftMarginLayer is None:
-                        leftMarginLayer = self.marginsPathLayer.appendLineSublayer(
-                            name=leftMarginLayerName,
-                            #startPoint=a,
-                            #endPoint=b,
-                            strokeColor=self.vectorStrokeColor,
-                            strokeWidth= self.instanceStrokeWidth,
-                            fillColor = None,
-                            strokeDash= self.vectorStrokeDash,
-                            strokeCap="round",
-                        )
-                    leftMarginLayer.setStartPoint(a)
-                    leftMarginLayer.setEndPoint(b)
+                    # leftMarginLayerName = f'instance_{editorGlyph.name}_leftMargin'
+                    # leftMarginLayer = self.marginsPathLayer.getSublayer(leftMarginLayerName)
+                    # if leftMarginLayer is None:
+                    #     leftMarginLayer = self.marginsPathLayer.appendLineSublayer(
+                    #         name=leftMarginLayerName,
+                    #         #startPoint=a,
+                    #         #endPoint=b,
+                    #         strokeColor=self.vectorStrokeColor,
+                    #         strokeWidth= self.instanceStrokeWidth,
+                    #         fillColor = None,
+                    #         strokeDash= self.vectorStrokeDash,
+                    #         strokeCap="round",
+                    #     )
+                    # leftMarginLayer.setStartPoint(a)
+                    # leftMarginLayer.setEndPoint(b)
 
-                    # layer append or update? 17
-                    rightMarginLayerName = f'instance_{editorGlyph.name}_rightMargin'
-                    rightMarginLayer = self.marginsPathLayer.getSublayer(rightMarginLayerName)
-                    if rightMarginLayer is None:
-                        rightMarginLayer = self.marginsPathLayer.appendLineSublayer(
-                            name=rightMarginLayerName,
-                            startPoint=c,
-                            endPoint=d,
-                            strokeColor=self.vectorStrokeColor,
-                            strokeWidth=  self.instanceStrokeWidth,
-                            fillColor = None,
-                            strokeDash=self.vectorStrokeDash,
-                            strokeCap="round",
-                        )
-                    rightMarginLayer.setStartPoint(c)
-                    rightMarginLayer.setEndPoint(d)
+                    # # layer append or update? 17
+                    # rightMarginLayerName = f'instance_{editorGlyph.name}_rightMargin'
+                    # rightMarginLayer = self.marginsPathLayer.getSublayer(rightMarginLayerName)
+                    # if rightMarginLayer is None:
+                    #     rightMarginLayer = self.marginsPathLayer.appendLineSublayer(
+                    #         name=rightMarginLayerName,
+                    #         startPoint=c,
+                    #         endPoint=d,
+                    #         strokeColor=self.vectorStrokeColor,
+                    #         strokeWidth=  self.instanceStrokeWidth,
+                    #         fillColor = None,
+                    #         strokeDash=self.vectorStrokeDash,
+                    #         strokeCap="round",
+                    #     )
+                    # rightMarginLayer.setStartPoint(c)
+                    # rightMarginLayer.setEndPoint(d)
 
     def updateSourceVectors(self, previewGlyph):
         if self.showPoints:
@@ -1262,14 +1263,16 @@ class LongboardEditorView(Subscriber):
                 
     def showSettingsChanged(self, info):
         # LongboardEditorView
-        if info["extrapolate"] is not None:
-            self.allowExtrapolation = info["extrapolate"]
+        if info["allowExtrapolation"] is not None:
+            self.allowExtrapolation = info["allowExtrapolation"]
         if info["showPreview"] is not None:
             self.showPreview = info["showPreview"]
         if info["showSources"] is not None:
             self.showSources = info["showSources"]
         if info["showPoints"] is not None:
             self.showPoints = info["showPoints"]
+        if info["wantsVarLib"] is not None:
+            self.wantsVarLib = info["wantsVarLib"]
         if info["showMeasurements"] is not None:
             self.showMeasurements = info["showMeasurements"]
         if info["longBoardHazeFactor"] is not None:
@@ -1277,28 +1280,24 @@ class LongboardEditorView(Subscriber):
         self.setPreferences()
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
-        #print("showSettingsChanged", self.showPoints)
 
 def uiSettingsExtractor(subscriber, info):
     # crikey there as to be a more efficient way to do this.
-    info["extrapolate"] = None
+    info["allowExtrapolation"] = None
     info["showPreview"] = None
     info["showSources"] = None
     info["showPoints"] = None
     info["showMeasurements"] = None
-    #info["useDiscreteLocationOfCurrentFont"] = None
+    info["wantsVarLib"] = None
     info["longBoardHazeFactor"] = None
     for lowLevelEvent in info["lowLevelEvents"]:
-        info["extrapolate"] = lowLevelEvent.get("extrapolate")
+        info["allowExtrapolation"] = lowLevelEvent.get("allowExtrapolation")
         info["showPreview"] = lowLevelEvent.get("showPreview")
         info["showSources"] = lowLevelEvent.get("showSources")
         info["showPoints"] = lowLevelEvent.get("showPoints")
         info["showMeasurements"] = lowLevelEvent.get("showMeasurements")
-        #info["useDiscreteLocationOfCurrentFont"] = lowLevelEvent.get("useDiscreteLocationOfCurrentFont")
+        info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
-
-
-
 
 registerSubscriberEvent(
     subscriberEventName=settingsChangedEventKey,
@@ -1309,9 +1308,6 @@ registerSubscriberEvent(
     delay=0,
     debug=True
 )
-
-
-
 
 # The concept of "relevant" operator:
 # it is the operator that belongs to the font that belongs to the glyph that is in the editor.
