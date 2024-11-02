@@ -18,6 +18,6 @@ This is for RoboFont 4.5+, you need to have the [DesignspaceEditor2 extension](h
 * LongBoard is **fast** and exists because of the work, support and help from [Frederik Berlaen](https://github.com/sponsors/typemytype) and [Tal Leming](https://github.com/sponsors/typesupply)
 * Roberto Arista also worked on an earlier edition of this project.
 * GitHub Sponsors who make the development of open, shared tools like this possible. In the small industry of type design, that makes a huge difference. You, or the company you work for, can sponsor open source type design tools like this. [My sponsor page is here.](https://github.com/sponsors/letterror)
-* And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardMechanicIcon__icon.png) for your support, feedback and patience!
+* And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardIcon_icon.png) for your support, feedback and patience!
 
 Visit [LettError.com](https://letterror.com) to see my fonts and other work. Take a look at [Superpolator.com](https://superpolator.com) for the theory of building designspaces for variable fonts, animated examples of interpolation problems and some tips on drawing for interpolation.
