@@ -53,6 +53,9 @@ toolID = "com.letterror.longboard"
 containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
 
+#KeyError:                 'com.letterror.longboard.settingsChanged.event'
+#settingsChangedEventKey     com.letterror.longboard.settingsChanged.event
+
 settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
@@ -157,7 +160,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> (Default Location) @resetPreview
         >> (Random Location) @randomPreview
         --------
-        Aopearance
+        Appearance
         
         * HorizontalStack @appearance        
         > * VerticalStack @appearanceColumn1
@@ -232,7 +235,13 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.getItem("randomPreview").enable(state)
         self.w.getItem("interestingLocationsPopup").enable(state)
         self.w.getItem("mathModelButton").enable(state)
-        
+
+        #self.w.getItem("showPreview").enable(state)
+        #self.w.getItem("showSources").enable(state)
+        #self.w.getItem("showPoints").enable(state)
+        #self.w.getItem("showMeasurements").enable(state)
+        #self.w.getItem("allowExtrapolation").enable(state)
+        #self.w.getItem("hazeSlider").enable(state)
         
     def locationToString(self, location):
         t = []
@@ -287,8 +296,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         try:
             font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         except:
-            self.showMessage("Longboard can not make the preview UFO.", informativeText="I'm printing the traceback in the Output.")
-            print("Longboard reports:")
+            self.showMessage("LongBoard can not make the preview UFO.", informativeText="I'm printing the traceback in the Output.")
+            print(f"LongBoard {longboardVersion} reports:")
             print(traceback.format_exc())
             return
         self.operator.useVarlib = useVarlibState
@@ -364,7 +373,15 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
 
     def interestingLocationsPopupCallback(self, sender):
         selectedIndex = sender.get()    # skip the first item, it is text
+        if selectedIndex == 0:
+            # it is the placeholder text. What to do? select the first one.
+            selectedIndex = 1
+        else:
+            selectedIndex = selectedIndex - 1
         selectionLocation = self.interestingLocations[selectedIndex]
+        print(f'interestingLocationsPopupCallback selectedIndex {selectedIndex}')
+        print(f'interestingLocationsPopupCallback self.interestingLocations {self.interestingLocations}')
+        print(f'interestingLocationsPopupCallback selectionLocation {selectionLocation}')
         self.operator.setPreviewLocation(selectionLocation)
         self.operator.changed()
         
@@ -406,15 +423,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def destroy(self):
         # LongBoardUIController
         unregisterGlyphEditorSubscriber(LongboardEditorView)
-
-    def checkAxisValueInExtremes(self, operator, axisName, axisValue):
-        # check if the axis Value for axis name is in between minimum and maximum
-        for axisRecord in operator.axes:
-            if axisRecord.name == axisName:
-                aD_minimum, aD_default, aD_maximum =  operator.getAxisExtremes(axisRecord)
-                if aD_minimum <= axisValue <= aD_maximum:
-                    return True
-        return False
         
     def navigatorLocationChanged(self, info):
         # LongBoardUIController
@@ -453,12 +461,17 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
                 value = editorObject.previewLocation_dragging[axisName]
-                value += .02 * offset    # subjective value! 
+                value += .025 * offset    # subjective value! 
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
         #print("preview clipping navigatorLocationChanged", self.w.getItem("allowExtrapolation").get())
         if self.w.getItem("allowExtrapolation").get() == 0:
-            editorObject.previewLocation_dragging = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
+            # AttributeError: 'NoneType' object has no attribute 'map_forward'
+            try:
+                clipped = self.operator.clipDesignLocation(editorObject.previewLocation_dragging)
+            except AttributeError:
+                clipped = editorObject.previewLocation_dragging
+            editorObject.previewLocation_dragging = clipped
         # update the instance outline, but not a rebuild, just move the points
         editorObject.updateInstanceOutline(rebuild=False)
     
@@ -479,34 +492,22 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         #print(f'relevantOperatorChanged {self.operator}')
         if self.operator is None:
             self.showMessage("No designspace?", informativeText=f'Open a designspace in DesignspaceEdit', alertStyle='informational', )
-            #print('No Operator found.')
             self.enableActionButtons(False)
-            #print("relevantOperatorChanged 1 No Operator")
             return
         
         #print(f"relevantOperatorChanged checking mathmodel preference: {self.operator.useVarlib}")
-        if self.operator.useVarlib:
-            self.w.getItem('mathModelButton').set(1)
-        else:
-            self.w.getItem('mathModelButton').set(0)
         glyphName = None
         if glyph is not None:
             self.enableActionButtons(True)
             glyphName = glyph.name
-            #print(f"relevantOperatorChanged 2 Glyph {glyph} {glyphName}")
-        else:
-            pass
-            #print(f"relevantOperatorChanged 3 No Glyph")
         currentLocation = self.operator.getPreviewLocation()
         if not currentLocation:
             # the operator can return an empty location.
             # let's reset it to the default location for this designspace and try again.
-            #print(f"\tresetting currentlocation in {self.operator}")
             self.resetPreviewCallback()
             return
-        #print(f"relevantOperatorChanged 4 currentLocation {type(currentLocation)} {currentLocation}")
-        # ask operator for the interaction sources stored in its lib
 
+        # ask operator for the interaction sources stored in its lib
         items = []
         prefs = []
         interactionSourcesPref = self.operator.lib.get(interactionSourcesLibKey)
@@ -555,7 +556,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 self.interestingLocations.append(instance.location)
         self.w.getItem("interestingLocationsPopup").setItems(interestingLocationsKeys)
         self.w.getItem("interestingLocationsPopup").set(0)
-        #self.operator = operator
         if self.operator.path is not None:
             if glyphName is not None:
                 self.w.setTitle(f"🛹 {operatorFileName} {glyphName}")
@@ -644,6 +644,7 @@ class LongboardEditorView(Subscriber):
         self.vectorStrokeDash = (2, 2)
         self.sourceStrokeDash = (1, 2)
         self.instanceStrokeDash = (5, 2)
+        self.instanceStrokeDashExtrapolate = (5, 7)
         self.instanceStrokeWidth = 1
         self.instanceMarkerSize = 4
         self.sourceMarkerSize = 3
@@ -721,7 +722,6 @@ class LongboardEditorView(Subscriber):
         self.measurementMarkerLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementTextLayer = self.measurementContainer.appendBaseSublayer()
 
-
     def glyphEditorWillShowPreview(self, info):
         self.preparePreview = True
         self.updateInstanceOutline()
@@ -793,7 +793,6 @@ class LongboardEditorView(Subscriber):
                 'horizontal': self.navigatorToolProgress[0]/timeSinceLastEvent,
                 'vertical': self.navigatorToolProgress[1]/timeSinceLastEvent,
                 }
-
         publishEvent(navigatorLocationChangedEventKey, data=data)
 
     def relevantForThisEditor(self, info=None):
@@ -860,6 +859,7 @@ class LongboardEditorView(Subscriber):
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
+    # Reference: more designspace subscriber events
     #    designspaceEditorSourcesDidAddSource
     #    designspaceEditorSourcesDidRemoveSource
     #    designspaceEditorSourcesDidChanged
@@ -878,6 +878,7 @@ class LongboardEditorView(Subscriber):
         self.updateInstanceOutline(rebuild=True)
 
     def checkExtrapolation(self, location):
+        # LongboardEditorView
         # check if the axis Value for axis name is in between minimum and maximum
         if self.operator is None: return False
         axes = {ar.name: ar for ar in self.operator.axes}
@@ -1019,7 +1020,6 @@ class LongboardEditorView(Subscriber):
             sourcePen = CollectorPen(glyphSet={})
             # do not draw the master we're drawing in
             # 
-            #if loc==continuousLocationForCurrentSource: continue
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
             if self.centerAllGlyphs:
@@ -1032,57 +1032,20 @@ class LongboardEditorView(Subscriber):
             self.sourceGlyphs.append(sourceGlyph)
 
     def updateSourcesOutlines(self, rebuild=True):
+        # draw the previously collected source outlines to a single merz path
         if self.operator is None:
             return
-
         self.prepareSourcesOutlines(rebuild=rebuild)
-
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
         if rebuild:
             self.sourcesPathLayer.setPath(None)
-            #self.sourcesMarkerLayer.clearSublayers()
-
         # merzpen
         sourcePen = merz.MerzPen()
         if self.showSources:
             for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
                 sourceGlyph.draw(sourcePen)
             self.sourcesPathLayer.setPath(sourcePen.path)
-                # sourceGlyphsLayerName = f"sourceGlyphPath_{sourceGlyphIndex}"
-                # sourceGlyphsLayer = self.sourcesPathLayer.getSublayer(sourceGlyphsLayerName)
-                # if sourceGlyphsLayer is None:
-                #     # layer append or update? 5
-                #     sourceGlyphsLayer = self.sourcesPathLayer.appendPathSublayer(
-                #         name=sourceGlyphsLayerName,
-                #         fillColor=None,
-                #         strokeColor=self.sourceStrokeColor,
-                #         strokeWidth=self.instanceStrokeWidth,
-                #         strokeDash=self.sourceStrokeDash,
-                #         strokeCap="round",
-                #         )
-                # sourceGlyphsLayer.setPath(sourceGlyph.getRepresentation("merz.CGPath"))
-
-        # if self.showPoints:
-        #     # show the on curve point vectors
-        #     for sourcePenIndex, sourcePen in enumerate(self.sourcePens):
-        #         for sourceOnCurveIndex, p in enumerate(sourcePen.onCurves):
-        #             isStart = p in sourcePen.startPoints
-        #             # layer append or update? 10
-        #             sourceOnCurveSymbolLayerName = f"source_marker_{sourcePenIndex}_{sourceOnCurveIndex}"
-        #             sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.getSublayer(sourceOnCurveSymbolLayerName)
-        #             if sourceOnCurveSymbolLayer is None:
-        #                 sourceOnCurveSymbolLayer = self.sourcesMarkerLayer.appendSymbolSublayer(
-        #                     name = sourceOnCurveSymbolLayerName,
-        #                     position = p,
-        #                     imageSettings = dict(
-        #                         name="rectangle",
-        #                         size=(self.sourceMarkerSize, self.sourceMarkerSize),
-        #                         fillColor=self.sourceStrokeColor
-        #                     ),
-        #                 )
-        #             sourceOnCurveSymbolLayer.setPosition(p)
-                        
         
     def updateInstanceOutline(self, rebuild=True):
         # LongboardEditorView
@@ -1113,7 +1076,6 @@ class LongboardEditorView(Subscriber):
 
         ds = self.operator
         sourcePens = []
-        
             
         # # boldly assume a font is only in a single discrete location
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
@@ -1155,16 +1117,23 @@ class LongboardEditorView(Subscriber):
                 path = previewGlyph.getRepresentation("merz.CGPath")
                 instanceLayerName = f'instance_outline_{editorGlyph.name}'
                 instanceLayer = self.instancePathLayer.getSublayer(instanceLayerName)
+                instanceStrokeDash = self.instanceStrokeDash
                 if instanceLayer is None:
                     instanceLayer = self.instancePathLayer.appendPathSublayer(
                         name = instanceLayerName,
                         fillColor=None,
                         strokeColor=self.instanceStrokeColor,
                         strokeWidth=self.instanceStrokeWidth,
-                        strokeDash = self.instanceStrokeDash,
+                        strokeDash = instanceStrokeDash,
                         strokeCap="round",
                         )
                 instanceLayer.setPath(path)
+                if self.checkExtrapolation(self.previewLocation_dragging):
+                    # we're outside the axis extremes, make the preview outline more stipply
+                    # we don't have to rebuild the whole path, just change the strokeDash attr.
+                    instanceStrokeDash = self.instanceStrokeDashExtrapolate
+                # but then we do need to set it each time.
+                instanceLayer.setStrokeDash(instanceStrokeDash)
                 
                 # set the path in the preview layer as well
                 # layer append or update? 13
@@ -1334,9 +1303,6 @@ def uiSettingsExtractor(subscriber, info):
         info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
 
-
-
-
 registerSubscriberEvent(
     subscriberEventName=settingsChangedEventKey,
     methodName="showSettingsChanged",
@@ -1346,9 +1312,6 @@ registerSubscriberEvent(
     delay=0,
     debug=True
 )
-
-
-
 
 # The concept of "relevant" operator:
 # it is the operator that belongs to the font that belongs to the glyph that is in the editor.
