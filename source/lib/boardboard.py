@@ -374,14 +374,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def interestingLocationsPopupCallback(self, sender):
         selectedIndex = sender.get()    # skip the first item, it is text
         if selectedIndex == 0:
-            # it is the placeholder text. What to do? select the first one.
-            selectedIndex = 1
-        else:
-            selectedIndex = selectedIndex - 1
+            # it is the placeholder text. Don't change anything
+            return
+        selectedIndex = selectedIndex - 1
         selectionLocation = self.interestingLocations[selectedIndex]
-        print(f'interestingLocationsPopupCallback selectedIndex {selectedIndex}')
-        print(f'interestingLocationsPopupCallback self.interestingLocations {self.interestingLocations}')
-        print(f'interestingLocationsPopupCallback selectionLocation {selectionLocation}')
         self.operator.setPreviewLocation(selectionLocation)
         self.operator.changed()
         
