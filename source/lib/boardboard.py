@@ -164,7 +164,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
         * HorizontalStack @appearance        
         > * VerticalStack @appearanceColumn1
-        #>> [X] Show Preview @showPreview
         >> [ ] Show Sources @showSources
         >> [ ] Show Vectors @showPoints
         >> (X MutatorMath X| VarLib ) @mathModelButton
@@ -174,7 +173,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> --X-- Haziness @hazeSlider
 
         --------
-        (⚙️LettError) @lettErrorButton
+        * HorizontalStack @links        
+        >(⚙️LettError) @lettErrorButton
+        >(⚙️Designspace Help) @designspaceTheoryButton
+        >(⚙️Sponsor) @gitHubSponsorButton
         """
         descriptionData = dict(
             axesTable=dict(
@@ -255,8 +257,17 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.enableActionButtons(False)
     
     def lettErrorButtonCallback(self, sender):
+        # open the LettError page
+        webbrowser.open("https://letterror.com")
+
+    def gitHubSponsorButtonCallback(self, sender):
         # open the LettError GitHub sponsor page because it would be nice.
-        webbrowser.open("https://github.com/letterror")    #https://letterror.com
+        webbrowser.open("https://github.com/sponsors/letterror")
+
+    def designspaceTheoryButtonCallback(self, sender):
+        # open the Superpolator designspace theory site
+        webbrowser.open("https://superpolator.com")
+        
         
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
