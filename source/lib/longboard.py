@@ -60,7 +60,7 @@ settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
 
-longBoardVersion = "1.3.1"
+longBoardVersion = "1.3.2"
 
 
 from mojo.events import (
@@ -145,43 +145,44 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         | xx | tf | pu | av |
         | ----------------- |
 
-        --------
-        (interestingLocations ...) @interestingLocationsPopup
-         
-        --------
-        Tools
-         
-        * HorizontalStack @tools        
-        > * VerticalStack @toolsColumn1
-        >> (Add New Instance) @addInstance
-        >> (Make Preview UFO) @makePreviewUFO
-        >> (Copy Glyph to Clipboard) @copyClipboard
-        > * VerticalStack @toolsColumn2
-        >> (Default Location) @resetPreview
-        >> (Random Location) @randomPreview
-        --------
-        Appearance
-        
-        * HorizontalStack @appearance        
-        > * VerticalStack @appearanceColumn1
-        >> [ ] Show Sources @showSources
-        >> [ ] Show Vectors @showPoints
-        >> (X MutatorMath X| VarLib ) @mathModelButton
-        > * VerticalStack @appearanceColumn2
-        >> [X] Show Measurements @showMeasurements
-        >> [ ] Allow Extrapolation @allowExtrapolation
-        >> --X-- Haziness @hazeSlider
 
-        --------
-        * HorizontalStack @links        
-        >(⚙️LettError) @lettErrorButton
-        >(⚙️Designspace Help) @designspaceTheoryButton
-        >(⚙️Sponsor) @gitHubSponsorButton
+        * Accordion: Tools @tools         
+        >(interestingLocations ...) @interestingLocationsPopup
+        >* HorizontalStack @toolsStack        
+        >>* VerticalStack @toolsColumn1
+        >>> (Add New Instance) @addInstance
+        >>> (Make Preview UFO) @makePreviewUFO
+        >>> (Copy Glyph to Clipboard) @copyClipboard
+        >> * VerticalStack @toolsColumn2
+        >>> (Default Location) @resetPreview
+        >>> (Random Location) @randomPreview
+
+        #--------
+        #Appearance
+
+        * Accordion: Appearance @appearance                         
+        >--------
+        >* HorizontalStack @appearanceStack       
+        >> * VerticalStack @appearanceColumn1
+        >>> [ ] Show Sources @showSources
+        >>> [ ] Show Vectors @showPoints
+        >>> (X MutatorMath X| VarLib ) @mathModelButton
+        >> * VerticalStack @appearanceColumn2
+        >>> [X] Show Measurements @showMeasurements
+        >>> [ ] Allow Extrapolation @allowExtrapolation
+        >>> --X-- Haziness @hazeSlider
+
+        * Accordion: About @about                         
+        >* HorizontalStack @links        
+        >>(⚙️ LettError) @lettErrorButton
+        >>(👨‍🚀 Designspace Help) @designspaceTheoryButton
+        >>(🩷 Sponsor) @gitHubSponsorButton
         """
+        wantUIWidth = 400
         descriptionData = dict(
             axesTable=dict(
                 height=100,
-                width=400,
+                width=wantUIWidth,
                 items = [],
                 columnDescriptions = [
                     dict(
@@ -207,7 +208,15 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     ),
                 ],
             ),
-
+            appearance=dict(
+                closed=True
+            ),
+            tools=dict(
+                closed=True
+            ),
+            about=dict(
+                closed=True
+            ),
             hazeSlider=dict(
                 minValue=0.08,
                 maxValue=0.8,
@@ -219,7 +228,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             content=content,
             descriptionData=descriptionData,
             controller=self,
-            size=(400, "auto")
+            size=(wantUIWidth, "auto")
         )
         self.operator = None
         self.axisValueDigits = 3
@@ -530,8 +539,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     #print(f"relevantOperatorChanged 4 {axisName} not in {currentLocation}")
                     axisValue = "-"
                 else:
-                    axisValue = round(currentLocation[axisName], self.axisValueDigits)
-                items.append(dict(textValue=axisName, popUpValue=v, axisValue=axisValue))
+                    value = currentLocation[axisName]
+                    if type(value) is tuple:
+                        roundedValue = round(value[0], self.axisValueDigits), round(value[1], self.axisValueDigits)
+                    else:
+                        roundedValue = round(value, self.axisValueDigits)
+                items.append(dict(textValue=axisName, popUpValue=v, axisValue=roundedValue))
         else:
             v = 0
             for axisObject in self.operator.getOrderedContinuousAxes():
