@@ -71,6 +71,39 @@ def glyphEditorIsInZoom():
     tool = getActiveEventTool()
     return bool(tool._zooming)
 
+# kink analysis
+def pt(*p):
+    return [(q.x, q.y) for q in p]
+
+def dotProduct(v1, v2):
+    return sum(x*y for x, y in zip(v1, v2))
+    
+def norm(v):
+    l = math.sqrt(v[0]**2+v[1]**2)
+    return v[0]/l, v[1]/l
+
+def findKinks(glyph, res=3):
+    results = []
+    contours = glyph.contours
+    for ci, c in enumerate(contours):
+        points = c.points
+        lp = len(points)
+        for pi, pt2 in enumerate(points):
+            if not pt2.smooth: continue
+            pt1 = points[pi-1]
+            pt3 = points[(pi+1)%lp]
+            if pt3.type == "offcurve" or pt1.type == "offcurve":
+                p1, p2, p3 = pt(pt1, pt2, pt3) #unpack them from RF points
+                # v1 is p1 / p2
+                # v2 is p2 / p3 ?
+                # endpoint - startpoint
+                v1 = norm((p2[0]-p1[0], p2[1]-p1[1]))
+                v2 = norm((p3[0]-p2[0], p3[1]-p2[1]))
+                dp = round(dotProduct(v1, v2), res)
+                if dp < 1:
+                    results.append((ci, p1, p2, p3, (1-dp)*100))
+    return results
+    
 class LongboardNavigatorTool(BaseEventTool):
     def setup(self):
         pass
@@ -163,6 +196,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> * VerticalStack @appearanceColumn1
         >>> [ ] Show Sources @showSources
         >>> [ ] Show Vectors @showPoints
+        >>> [X] Show Kinks @showKinks
         >>> (X MutatorMath X| VarLib ) @mathModelButton
         >> * VerticalStack @appearanceColumn2
         >>> [X] Show Measurements @showMeasurements
@@ -273,7 +307,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def designspaceTheoryButtonCallback(self, sender):
         # open the Superpolator designspace theory site
         webbrowser.open("https://superpolator.com")
-        
         
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
@@ -456,8 +489,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
 
         # @@_mouse_drag_updating_data
         editorObject = data['editor']
-        #print(f"navigatorLocationChanged operator {os.path.basename(self.operator.path)}")
-        #print(f"navigatorLocationChanged editorObject {editorObject}")
 
         unit = {}
         unitScale = 100
@@ -477,7 +508,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 value += .025 * offset    # subjective value! 
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
-        #print("preview clipping navigatorLocationChanged", self.w.getItem("allowExtrapolation").get())
         if self.w.getItem("allowExtrapolation").get() == 0:
             # AttributeError: 'NoneType' object has no attribute 'map_forward'
             try:
@@ -501,14 +531,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.operator = info["lowLevelEvents"][0].get('operator')
         operatorFileName = self.getOperatorFileName(self.operator)
         glyph = info["lowLevelEvents"][0].get('glyph')
-        #print('relevantOperatorChanged', info["lowLevelEvents"][0])
-        #print(f'relevantOperatorChanged {self.operator}')
         if self.operator is None:
             self.showMessage("No designspace?", informativeText=f'Open a designspace in DesignspaceEdit', alertStyle='informational', )
             self.enableActionButtons(False)
             return
-        
-        #print(f"relevantOperatorChanged checking mathmodel preference: {self.operator.useVarlib}")
         glyphName = None
         if glyph is not None:
             self.enableActionButtons(True)
@@ -533,7 +559,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 elif interaction == "vertical":
                     v = 1
                 if not axisName in currentLocation:
-                    #print(f"relevantOperatorChanged 4 {axisName} not in {currentLocation}")
                     axisValue = "-"
                 else:
                     value = currentLocation[axisName]
@@ -604,6 +629,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         value = sender.get()
         postEvent(settingsChangedEventKey, showMeasurements=value)
     
+    def showKinksCallback(self, sender):
+        # LongBoardUIController
+        value = sender.get()==1
+        postEvent(settingsChangedEventKey, showKinks=value)
+    
     def hazeSliderCallback(self, sender):
         # LongBoardUIController
         value = sender.get()
@@ -636,6 +666,7 @@ class LongboardEditorView(Subscriber):
             fillModel = (.5,.5,.5, .8*haze)
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
+            kinkModel = (1,.2,0, haze)
             self.measurementStrokeColor = (0, 1, 1, 1)
             self.measurementFillColor = (0, 1, 1, 1)
         else:
@@ -643,11 +674,13 @@ class LongboardEditorView(Subscriber):
             fillModel = (.5,.5,.5, haze)
             strokeModel = (0,0,0,haze)
             vectorModel = (.2,.2,.2, haze)
+            kinkModel = (1,.2,0, haze)
             self.measurementStrokeColor = (0, .25, .5, 1)
             self.measurementFillColor = (0, .25, .5, 1)
         self.sourceStrokeColor = vectorModel
         self.instanceStrokeColor = strokeModel
         self.vectorStrokeColor = vectorModel
+        self.kinkStrokeColor = kinkModel
         self.previewFillColor = fillModel
         self.previewStrokeColor = strokeModel
         
@@ -663,6 +696,8 @@ class LongboardEditorView(Subscriber):
         self.instanceStrokeDash = (5, 2)
         self.instanceStrokeDashExtrapolate = (5, 7)
         self.instanceStrokeWidth = 1
+        self.kinkStrokeDash = None    #(0, 16)
+        self.kinkStrokeWidth = 4
         self.instanceMarkerSize = 4
         self.sourceMarkerSize = 3
         self.measureLineCurveOffset = 50
@@ -677,6 +712,7 @@ class LongboardEditorView(Subscriber):
         self.allowExtrapolation = False    # should we show extrapolation
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
+        self.showKinks = True
         self.wantsVarLib = False
         self.showSources = False
         self.sourcePens = []
@@ -718,6 +754,13 @@ class LongboardEditorView(Subscriber):
             strokeWidth=self.instanceStrokeWidth,
             fillColor = None,
             strokeDash = self.sourceStrokeDash,
+            strokeCap="round",
+        )
+        self.kinkPathLayer = self.editorContainer.appendPathSublayer(
+            strokeColor=self.kinkStrokeColor,
+            strokeWidth=self.kinkStrokeWidth,
+            fillColor = None,
+            strokeDash=self.kinkStrokeDash,
             strokeCap="round",
         )
         self.pointsPathLayer = self.editorContainer.appendPathSublayer(
@@ -928,6 +971,20 @@ class LongboardEditorView(Subscriber):
             return
         self.updateInstanceOutline(rebuild=True)
     
+    def findKinks(self, editorGlyph, previewShift, previewGlyph):
+        # LongboardEditorView
+        # analyse and draw lines for possible kinks
+        # for speed we might want to draw them all in 1 layer
+        # but that means we can't show any quantification
+        results = findKinks(previewGlyph)
+        kinkPen = merz.MerzPen()
+        for contourIndex, p1, p2, p3, df in results:
+            kinkPen.moveTo(p1)
+            kinkPen.lineTo(p2)
+            kinkPen.lineTo(p3)
+            kinkPen.endPath()
+        self.kinkPathLayer.setPath(kinkPen.path)
+        
     def drawMeasurements(self, editorGlyph, previewShift, previewGlyph):
         # LongboardEditorView
         # draw intersections for the current measuring beam and the current preview
@@ -1077,6 +1134,7 @@ class LongboardEditorView(Subscriber):
             self.instancePathLayer.clearSublayers()
             self.previewPathLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
+            self.kinkPathLayer.setPath(None)
             self.marginsPathLayer.setPath(None)
             self.pointsPathLayer.setPath(None)
 
@@ -1128,6 +1186,8 @@ class LongboardEditorView(Subscriber):
             previewGlyph.draw(cpPreview)
             if self.showMeasurements:
                 self.drawMeasurements(editorGlyph,  shift, previewGlyph)
+            if self.showKinks:
+                self.findKinks(editorGlyph,  shift, previewGlyph)
 
             if self.showPreview:
                 # 01 stroke instance path in the editor layer
@@ -1184,7 +1244,6 @@ class LongboardEditorView(Subscriber):
                                     ),
                                 )
                         onCurveSymbolLayer.setPosition(m)
-                        
                     # 04 off curve markers on instance outline
                     for im, m in enumerate(cpPreview.offCurves):
                         # layer append or update? 15
@@ -1199,11 +1258,8 @@ class LongboardEditorView(Subscriber):
                                     fillColor=self.instanceStrokeColor
                                 ),
                             )
-                            
                         offCurveSymbolLayer.setPosition(m)
-
                     # 05 draw small lines for the left and right margins of the instance outline
-                    #@@
                     # show the margin lines at the expected angle
                     italicSlantOffset = editorGlyph.font.lib.get(self.italicSlantOffsetKey, 0)
                     angle = editorGlyph.font.info.italicAngle
@@ -1216,18 +1272,7 @@ class LongboardEditorView(Subscriber):
                     shiftRight = .5*editorGlyph.width +.5*previewGlyph.width
                     c = (shiftRight-dx+italicSlantOffset, -self.marginLineHeight)
                     d = (shiftRight+italicSlantOffset, 0)
-                    # layer append or update? 16
-                    
                     marginLayerName = f'instance_{editorGlyph.name}_margins'
-                    # marginLayer = self.marginsPathLayer.getSublayer(marginLayerName)
-                    # if marginLayer is None:
-                    #     marginLayer = self.marginsPathLayer.appendPathSublayer(
-                    #         name = marginLayerName,
-                    #         strokeColor = self.vectorStrokeColor,
-                    #         strokeDash = self.previewStrokeDash,
-                    #         strokeWidth = 1,
-                    #         fillColor = None,
-                    #     )
                     marginLinePath = merz.MerzPen()
                     marginLinePath.moveTo(a)
                     marginLinePath.lineTo(b)
@@ -1236,39 +1281,6 @@ class LongboardEditorView(Subscriber):
                     marginLinePath.lineTo(d)
                     marginLinePath.endPath()
                     self.marginsPathLayer.setPath(marginLinePath.path)
-
-                    # leftMarginLayerName = f'instance_{editorGlyph.name}_leftMargin'
-                    # leftMarginLayer = self.marginsPathLayer.getSublayer(leftMarginLayerName)
-                    # if leftMarginLayer is None:
-                    #     leftMarginLayer = self.marginsPathLayer.appendLineSublayer(
-                    #         name=leftMarginLayerName,
-                    #         #startPoint=a,
-                    #         #endPoint=b,
-                    #         strokeColor=self.vectorStrokeColor,
-                    #         strokeWidth= self.instanceStrokeWidth,
-                    #         fillColor = None,
-                    #         strokeDash= self.vectorStrokeDash,
-                    #         strokeCap="round",
-                    #     )
-                    # leftMarginLayer.setStartPoint(a)
-                    # leftMarginLayer.setEndPoint(b)
-
-                    # # layer append or update? 17
-                    # rightMarginLayerName = f'instance_{editorGlyph.name}_rightMargin'
-                    # rightMarginLayer = self.marginsPathLayer.getSublayer(rightMarginLayerName)
-                    # if rightMarginLayer is None:
-                    #     rightMarginLayer = self.marginsPathLayer.appendLineSublayer(
-                    #         name=rightMarginLayerName,
-                    #         startPoint=c,
-                    #         endPoint=d,
-                    #         strokeColor=self.vectorStrokeColor,
-                    #         strokeWidth=  self.instanceStrokeWidth,
-                    #         fillColor = None,
-                    #         strokeDash=self.vectorStrokeDash,
-                    #         strokeCap="round",
-                    #     )
-                    # rightMarginLayer.setStartPoint(c)
-                    # rightMarginLayer.setEndPoint(d)
 
     def updateSourceVectors(self, previewGlyph):
         if self.showPoints:
@@ -1297,6 +1309,8 @@ class LongboardEditorView(Subscriber):
             self.wantsVarLib = info["wantsVarLib"]
         if info["showMeasurements"] is not None:
             self.showMeasurements = info["showMeasurements"]
+        if info["showKinks"] is not None:
+            self.showKinks = info["showKinks"]
         if info["longBoardHazeFactor"] is not None:
             self.longBoardHazeFactor = info["longBoardHazeFactor"]
         self.setPreferences()
@@ -1310,6 +1324,7 @@ def uiSettingsExtractor(subscriber, info):
     info["showSources"] = None
     info["showPoints"] = None
     info["showMeasurements"] = None
+    info["showKinks"] = None
     info["wantsVarLib"] = None
     info["longBoardHazeFactor"] = None
     for lowLevelEvent in info["lowLevelEvents"]:
@@ -1318,6 +1333,7 @@ def uiSettingsExtractor(subscriber, info):
         info["showSources"] = lowLevelEvent.get("showSources")
         info["showPoints"] = lowLevelEvent.get("showPoints")
         info["showMeasurements"] = lowLevelEvent.get("showMeasurements")
+        info["showKinks"] = lowLevelEvent.get("showKinks")
         info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
 
