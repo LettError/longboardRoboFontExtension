@@ -682,6 +682,7 @@ class LongboardEditorView(Subscriber):
         self.sourcePens = []
         self.sourceGlyphs = []
         self.centerAllGlyphs = True
+        self.centerFactor = 0    # -1: left, 0: center, 1: right
         self.showPoints = False
         self.showMeasurements = True
         self.useDiscreteLocationOfCurrentFont = True
@@ -1040,7 +1041,7 @@ class LongboardEditorView(Subscriber):
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
             if self.centerAllGlyphs:
-                xMin, yMin, xMax, yMax = sourceGlyph.bounds
+                #xMin, yMin, xMax, yMax = sourceGlyph.bounds
                 # centering
                 shift = .5*editorGlyph.width-.5*sourceGlyph.width
                 sourceGlyph.moveBy((shift, 0))
@@ -1116,7 +1117,7 @@ class LongboardEditorView(Subscriber):
 
             shift = 0
             if self.centerAllGlyphs:
-                xMin, yMin, xMax, yMax = previewGlyph.bounds
+                #xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = .5*editorGlyph.width-.5*previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
 
