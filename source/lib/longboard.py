@@ -171,15 +171,18 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def build(self):
         # LongBoardUIController
         content = """
+
+        (interestingLocations ...) @interestingLocationsPopup
+
         | ----------------- | @axesTable
         | xx | tf | pu | av |
         | ----------------- |
 
+        * Accordion: Tools @tools 
 
-        * Accordion: Tools @tools         
-        >(interestingLocations ...) @interestingLocationsPopup
-        >* HorizontalStack @toolsStack        
-        >>* VerticalStack @toolsColumn1
+        > ----
+        > * HorizontalStack @toolsStack        
+        >> * VerticalStack @toolsColumn1
         >>> (Add New Instance) @addInstance
         >>> (Make Preview UFO) @makePreviewUFO
         >>> (Copy Glyph to Clipboard) @copyClipboard
@@ -187,21 +190,22 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> (Default Location) @resetPreview
         >>> (Random Location) @randomPreview
 
-        #--------
-        #Appearance
+        > ----
+        > * HorizontalStack @geometryStack       
+        >> (X MutatorMath X| VarLib ) @mathModelButton
+        >> [ ] Allow Extrapolation @allowExtrapolation
 
-        * Accordion: Appearance @appearance                         
-        >--------
-        >* HorizontalStack @appearanceStack       
+        > ----
+        > * HorizontalStack @appearanceStack       
         >> * VerticalStack @appearanceColumn1
-        >>> [ ] Show Sources @showSources
-        >>> [ ] Show Vectors @showPoints
-        >>> [X] Show Kinks @showKinks
-        >>> (X MutatorMath X| VarLib ) @mathModelButton
+        #>> Align Preview & Sources
+        >>> ( Left |X Center X| Right ) @alignPreviewButton
+        >>> --X-- Haziness @hazeSlider
         >> * VerticalStack @appearanceColumn2
         >>> [X] Show Measurements @showMeasurements
-        >>> [ ] Allow Extrapolation @allowExtrapolation
-        >>> --X-- Haziness @hazeSlider
+        >>> [X] Show Kinks @showKinks
+        >>> [ ] Show Sources @showSources
+        >>> [ ] Show Vectors @showPoints
 
         * Accordion: About @about                         
         >* HorizontalStack @links        
@@ -239,9 +243,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     ),
                 ],
             ),
-            appearance=dict(
-                closed=True
-            ),
             tools=dict(
                 closed=True
             ),
@@ -277,13 +278,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.getItem("randomPreview").enable(state)
         self.w.getItem("interestingLocationsPopup").enable(state)
         self.w.getItem("mathModelButton").enable(state)
-
-        #self.w.getItem("showPreview").enable(state)
-        #self.w.getItem("showSources").enable(state)
-        #self.w.getItem("showPoints").enable(state)
-        #self.w.getItem("showMeasurements").enable(state)
-        #self.w.getItem("allowExtrapolation").enable(state)
-        #self.w.getItem("hazeSlider").enable(state)
+        self.w.getItem("alignPreviewButton").enable(state)
         
     def locationToString(self, location):
         t = []
@@ -362,6 +357,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         font.close()
         OpenFont(ufoPath, showInterface=True)
 
+    def alignPreviewButtonCallback(self, sender):
+        alignState = ['left', 'center', 'right'][sender.get()]
+        postEvent(settingsChangedEventKey, previewAlign=alignState)
+          
     def mathModelButtonCallback(self, sender):
         # switch to the preferred math model for the previews
         # 0: calculate preview with MutatorMath
@@ -423,14 +422,15 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
 
     def interestingLocationsPopupCallback(self, sender):
         selectedIndex = sender.get()    # skip the first item, it is text
+        for i, item in enumerate(self.interestingLocations):
+            location, name = item
         if selectedIndex == 0:
             # it is the placeholder text. Don't change anything
             return
-        selectedIndex = selectedIndex - 1
-        selectionLocation = self.interestingLocations[selectedIndex]
+        selectionLocation = self.interestingLocations[selectedIndex][0]
         self.operator.setPreviewLocation(selectionLocation)
         self.operator.changed()
-        
+    
     def axesTableEditCallback(self, sender):
         # LongBoardUIController
         # callback for the interaction sources table
@@ -554,6 +554,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         if interactionSourcesPref is not None:
             for axisName, interaction in interactionSourcesPref:
                 v = 2
+                roundedValue = None
                 if interaction == "horizontal":
                     v = 0
                 elif interaction == "vertical":
@@ -586,18 +587,33 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             self.operator.changed()
         self.w.getItem("axesTable").set(items)
         #collect interesting locations here
-        self.interestingLocations = []
-        interestingLocationsKeys = [f"Interesting Locations in {operatorFileName}…"]    # the names for the menu
+        currentIndex = 0
+        itemIndex = 0
+        interestingLocations = [(None, f"Interesting Locations in {operatorFileName}…")]
+        itemIndex += 1
+        # add source locations
         for src in self.operator.sources:
             if src.location is not None:
-                interestingLocationsKeys.append(f"Source {os.path.basename(src.path)}")
-                self.interestingLocations.append(src.location)
+                if src.layerName is not None:
+                    layerName = f", layer {src.layerName}"
+                else:
+                    layerName = ""
+                interestingLocations.append((src.location, f"🟠 {os.path.basename(src.path)}{layerName}"))
+            itemIndex += 1
+        # add instance locations
         for instance in self.operator.instances:
-            if instance.location is not None:
-                interestingLocationsKeys.append(f'Instance {instance.familyName} {instance.styleName}')
-                self.interestingLocations.append(instance.location)
-        self.w.getItem("interestingLocationsPopup").setItems(interestingLocationsKeys)
-        self.w.getItem("interestingLocationsPopup").set(0)
+            dsloc = instance.getFullDesignLocation(self.operator) # converted
+            dsLoc, dsLocDiscrete = self.operator.splitLocation(dsloc)
+            if dsloc is not None:
+                interestingLocations.append((dsloc, f'🔘 Instance {instance.familyName} {instance.styleName}'))
+            itemIndex += 1
+        self.interestingLocations = interestingLocations
+        self.w.getItem("interestingLocationsPopup").setItems([b for a, b in interestingLocations])
+        for itemIndex, item in enumerate(interestingLocations):
+            itemLocation, itemLabel = item
+            if currentLocation == itemLocation:
+                self.w.getItem("interestingLocationsPopup").set(itemIndex)
+                break
         if self.operator.path is not None:
             if glyphName is not None:
                 self.w.setTitle(f"🛹 {operatorFileName} {glyphName}")
@@ -713,11 +729,12 @@ class LongboardEditorView(Subscriber):
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showKinks = True
+        self.previewAlign = "center"
         self.wantsVarLib = False
         self.showSources = False
         self.sourcePens = []
         self.sourceGlyphs = []
-        self.centerAllGlyphs = True
+        #self.centerAllGlyphs = True
         self.centerFactor = 0    # -1: left, 0: center, 1: right
         self.showPoints = False
         self.showMeasurements = True
@@ -905,6 +922,7 @@ class LongboardEditorView(Subscriber):
         if previewLocation_dragging is None:
             previewLocation_dragging = ds.newDefaultLocation()
             ds.setPreviewLocation(previewLocation_dragging)
+        # split into continuous and discrete
         previewContinuous, previewDiscrete = ds.splitLocation(previewLocation_dragging)
         glyphEditor = self.getGlyphEditor()
         editorGlyph = self.getGlyphEditor().getGlyph()
@@ -946,9 +964,11 @@ class LongboardEditorView(Subscriber):
         for axisName in location:
             axisRecord = axes.get(axisName)
             if axisRecord is None: continue
-            aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
-            if not (aD_minimum <= location.get(axisRecord.name) <= aD_maximum): 
-                return True
+            if hasattr(axisRecord, "minimum"):
+                # probably continuous, discrete axes don't extrapolate
+                aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
+                if not (aD_minimum <= location.get(axisRecord.name) <= aD_maximum): 
+                    return True
         return False
         
     def designspaceEditorPreviewLocationDidChange(self, info):
@@ -1097,11 +1117,14 @@ class LongboardEditorView(Subscriber):
             # 
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
-            if self.centerAllGlyphs:
-                #xMin, yMin, xMax, yMax = sourceGlyph.bounds
+            if self.previewAlign == "center":
                 # centering
                 shift = .5*editorGlyph.width-.5*sourceGlyph.width
                 sourceGlyph.moveBy((shift, 0))
+            elif self.previewAlign == "right":
+                shift = editorGlyph.width-sourceGlyph.width
+                sourceGlyph.moveBy((shift, 0))
+                
             sourceGlyph.draw(sourcePen)
             self.sourcePens.append(sourcePen)
             self.sourceGlyphs.append(sourceGlyph)
@@ -1174,9 +1197,13 @@ class LongboardEditorView(Subscriber):
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
 
             shift = 0
-            if self.centerAllGlyphs:
+            if self.previewAlign == "center":
                 #xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = .5*editorGlyph.width-.5*previewGlyph.width
+                previewGlyph.moveBy((shift, 0))
+            elif self.previewAlign == "right":
+                #xMin, yMin, xMax, yMax = previewGlyph.bounds
+                shift = editorGlyph.width-previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
 
             # @@
@@ -1311,6 +1338,8 @@ class LongboardEditorView(Subscriber):
             self.showMeasurements = info["showMeasurements"]
         if info["showKinks"] is not None:
             self.showKinks = info["showKinks"]
+        if info["previewAlign"] is not None:
+            self.previewAlign = info["previewAlign"]
         if info["longBoardHazeFactor"] is not None:
             self.longBoardHazeFactor = info["longBoardHazeFactor"]
         self.setPreferences()
@@ -1327,6 +1356,7 @@ def uiSettingsExtractor(subscriber, info):
     info["showKinks"] = None
     info["wantsVarLib"] = None
     info["longBoardHazeFactor"] = None
+    info['previewAlign'] = None
     for lowLevelEvent in info["lowLevelEvents"]:
         info["allowExtrapolation"] = lowLevelEvent.get("allowExtrapolation")
         info["showPreview"] = lowLevelEvent.get("showPreview")
@@ -1336,6 +1366,7 @@ def uiSettingsExtractor(subscriber, info):
         info["showKinks"] = lowLevelEvent.get("showKinks")
         info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
+        info["previewAlign"] = lowLevelEvent.get("previewAlign")
 
 registerSubscriberEvent(
     subscriberEventName=settingsChangedEventKey,

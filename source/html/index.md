@@ -12,7 +12,7 @@ It is the successor to the Skateboard and Superpolator tools.
 
 This is for RoboFont 4.5+, you need to have the [DesignspaceEditor2 extension](https://github.com/LettError/designSpaceRoboFontExtension) installed. Longboard will activate when you have a designspace open in DSE2, and a glyph edit window for one of the sources.
 
-![The LongBoard UI](screen_20241105.png)
+![The LongBoard UI](screen_20241112.png)
 
 Use Longboard to smoothly explore your designspaces in the glyph editor. A single mouse drag can manipulate as many axis values as you want. To set it up, use the table at the top of the LongBoard Window. It lists the **continuous axes** available for exploring. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will change width axis values. And vertical movements will correspond to change in weight axis values.
 
@@ -20,7 +20,7 @@ Longboard determines the values for the **discrete axes** from the source you're
 
 Double click on the axis values to edit the numbers.
 
-The **Tools**, **Appearance** and **About** tabs can close to save some space.
+The **Tools** and **About** tabs can close to save some space.
 
 ## Buttons
 
@@ -58,3 +58,7 @@ The **Tools**, **Appearance** and **About** tabs can close to save some space.
 * And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardIcon_icon.png) for your support, feedback and patience!
 
 Visit [LettError.com](https://letterror.com) to see my fonts and other work. Take a look at [Superpolator.com](https://superpolator.com) for the theory of building designspaces for variable fonts, animated examples of interpolation problems and some tips on drawing for interpolation.
+
+## Versions
+* 1.3.2 Initial public release
+* 1.3.3 Add Kink reporting, UI tweaks.
