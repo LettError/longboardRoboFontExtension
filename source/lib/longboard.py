@@ -388,7 +388,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # set the preview location to the default.
         currentPreviewLocation = self.operator.getPreviewLocation()
         currentPreviewContinuous, currentPreviewDiscrete = self.operator.splitLocation(currentPreviewLocation)
-        defaultLocation = self.operator.newDefaultLocation(discreteLocation=currentPreviewDiscrete)
+        defaultLocation = self.operator.newDefaultLocation(bend=True, discreteLocation=currentPreviewDiscrete)
         self.operator.setPreviewLocation(defaultLocation)
         self.operator.changed()
     
@@ -920,7 +920,7 @@ class LongboardEditorView(Subscriber):
         ds = self.operator
         previewLocation_dragging = ds.getPreviewLocation()
         if previewLocation_dragging is None:
-            previewLocation_dragging = ds.newDefaultLocation()
+            previewLocation_dragging = ds.newDefaultLocation(bend=True)
             ds.setPreviewLocation(previewLocation_dragging)
         # split into continuous and discrete
         previewContinuous, previewDiscrete = ds.splitLocation(previewLocation_dragging)
