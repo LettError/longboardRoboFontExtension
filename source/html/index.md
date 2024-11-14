@@ -16,13 +16,20 @@ This is for RoboFont 4.5+, you need to have the [DesignspaceEditor2 extension](h
 
 Use Longboard to smoothly explore your designspaces in the glyph editor. A single mouse drag can manipulate as many axis values as you want. To set it up, use the table at the top of the LongBoard Window. It lists the **continuous axes** available for exploring. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will change width axis values. And vertical movements will correspond to change in weight axis values.
 
-Longboard determines the values for the **discrete axes** from the source you're currently looking at. So if your designspace has a continuous weight and a discrete italic axis, Longboard will show upright weight variations in the upright sources, and italic weight variations in italic sources.
+* **Drag + Shift Key:** constrain movement to horizontal or vertical.
+* **Drag + Option Key:** a slower response for more precise movements. If you want to get that one specific value.
 
-Double click on the axis values to edit the numbers.
+Longboard takes the values for the **discrete axes** from the source you're currently looking at. So if your designspace has a continuous weight and a discrete italic axis, Longboard will show upright weight variations in the upright sources, and italic weight variations in italic sources.
+
+Double click on the axis values to edit the numbers. Anisotropic values are not yet supported.
 
 The **Tools** and **About** tabs can close to save some space.
 
-## Buttons
+## Interesting Locations
+
+A popup list has all the interesting locations in the current designspace. Source locations, instance locations. I will add more when I think of them.
+
+## Tools
 
 * **Add New Instance** Creates a new instance in the current designspace. Family name is copied from the default source. Style name is created from axis names and values. Use DSE2 to set all the other parameters. LongBoard warns you if the location is already in use.
 * **Make Preview UFO** This creates a new UFO for the current preview location. RoboFont operns the UFO when it is ready. This UFO can be used for inspection, proofing, detailed measuring and so on. The UFOs are saved in the **preview** folder next to the designspace file. This will **not** make a new instance in the designspace. If you want to add the preview UFO as a source, you have to move it out of the Previews folder and rename it. Mote: Preview UFOs have floating point coordinates because precision.
@@ -30,12 +37,20 @@ The **Tools** and **About** tabs can close to save some space.
 * **Default Location** will take the Preview home to the default location. In case you get lost in crazy extrapolations. 
 * **Random Location** will take the Preview to a random location in the designspace. In case you want to see the sights. If you have **Allow Extrapolation** checked, the random location will extrapolate a bit over the axis extremes.
 
+## Math Model
+
+* **MutatorMath / VarLib** switches between the math model used for the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
+* **Allow Extrapolation** Restrict the dragging with the Navigator tool to the axis extremes, or go wild. Variable font technology can not extrapolate. But in type design it can be a useful thing. Again, do what you need.
+
 ## Appearance
 
+* **Left / Center /Right** controls where the preview aligns in the editor.
+* **Slider** controls the visibility of the preview.
+
+* **Show Measurements** This applies the RoboFont Measure tool to the preview and shows the dimensions in blue. This way you can search for very specific stems, for instance.
+* **Show Kinks** For point types marked **smooth** this highlights curve sections where the incoming and outgoing lines are no longer smooth.
 * **Show Sources** draws all the sources for this glyph as well as the preview. This can be useful, but it can also be quite busy, visually. You be the judge and choose what you need. The sources are drawn centered under the current glyph.
 * **Show Vectors** draws a vector between the sources and the preview. So you can see how the points get pulled around. This can be useful to spot compatibility issues.
-* **Show Measurements** This applies the RoboFont Measure tool to the preview and shows the dimensions in blue. This way you can search for very specific stems, for instance.
-* **Allow Extrapolation** Restrict the dragging with the Navigator tool to the axis extremes, or go wild. Variable font technology can not extrapolate. But in type design it can be a useful thing. Again, do what you need.
 
 ## Navigator
 
@@ -62,3 +77,5 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 ## Versions
 * 1.3.2 Initial public release
 * 1.3.3 Add Kink reporting, UI tweaks.
+* 1.3.4 Fix issue with default location
+* 1.3.5 Add some modifier key features.

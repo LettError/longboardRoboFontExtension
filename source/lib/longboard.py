@@ -480,7 +480,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # sort extrapolation here?
         # or post the filter table when it changes
         # and handle everything in glypheditor?
-        view = info["lowLevelEvents"][-1].get('view')
+        lastEvent = info["lowLevelEvents"][-1]
+        view = lastEvent.get('view')
         offset = view.offset()
         viewScale = view.scale()
         popOptions = ['horizontal', 'vertical', None]
@@ -841,7 +842,7 @@ class LongboardEditorView(Subscriber):
         # Otherwise this could have gone straight to the UI.
         if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
         if not self.operator: return
-
+        #glyphEditorDidMouseDrag {'shiftDown': 131072, 'capLockDown': 0, 'optionDown': 0, 'controlDown': 0, 'commandDown': 0, 'locationInWindow': <CoreFoundation.CGPoint x=308.4765625 y=274.890625>, 'locationInView': <CoreFoundation.CGPoint x=1334.4765625 y=2104.890625>, 'clickCount': 0}
         view = info["lowLevelEvents"][-1].get('view')
         viewScale = view.scale()
         pt = info["lowLevelEvents"][-1]['point']
@@ -865,11 +866,26 @@ class LongboardEditorView(Subscriber):
         # because the UI needs to call a redraw afterwards
         
         # @@_mouse_drag_updating_data
+        dx = self.navigatorToolProgress[0]/timeSinceLastEvent
+        dy = self.navigatorToolProgress[1]/timeSinceLastEvent
+        #print("shiftDown", info.get("deviceState").get('shiftDown'))
+        #print("optionDown", info.get("deviceState").get('optionDown'))
+        if info.get("deviceState").get('shiftDown') == 131072:
+            # constrain the movements.
+            # shift pressed: clamp x or y
+            if abs(dx) > abs(dy):
+                dy = 0
+            else:
+                dx = 0
+        if info.get("deviceState").get('optionDown') == 524288:
+            # option pressed: slower speed
+            dx *= 0.125
+            dy *= 0.125
         data = {
                 'editor': self, 
                 'previewLocation': self.previewLocation_dragging,
-                'horizontal': self.navigatorToolProgress[0]/timeSinceLastEvent,
-                'vertical': self.navigatorToolProgress[1]/timeSinceLastEvent,
+                'horizontal': dx,
+                'vertical': dy,
                 }
         publishEvent(navigatorLocationChangedEventKey, data=data)
 
