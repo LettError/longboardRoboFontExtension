@@ -32,15 +32,15 @@ A popup list has all the interesting locations in the current designspace. Sourc
 ## Tools
 
 * **Add New Instance** Creates a new instance in the current designspace. Family name is copied from the default source. Style name is created from axis names and values. Use DSE2 to set all the other parameters. LongBoard warns you if the location is already in use.
-* **Make Preview UFO** This creates a new UFO for the current preview location. RoboFont operns the UFO when it is ready. This UFO can be used for inspection, proofing, detailed measuring and so on. The UFOs are saved in the **preview** folder next to the designspace file. This will **not** make a new instance in the designspace. If you want to add the preview UFO as a source, you have to move it out of the Previews folder and rename it. Mote: Preview UFOs have floating point coordinates because precision.
-* **Copy Glyph to Clipboard** Does as advertised. The preview glyph to the clipboard so you can paste it somewhere else. This glyph has decomposed components for obvious reasons.
+* **Make Preview UFO** This creates a new UFO for the current preview location. RoboFont opens the UFO when it is ready. This UFO can be used for inspection, proofing, detailed measuring and so on. The UFOs are saved in the **preview** folder next to the designspace file. This will **not** make a new instance in the designspace. If you want to add the preview UFO as a source, you have to move it out of the Previews folder and rename it. Mote: Preview UFOs have floating point coordinates, metrics and kerning because precision.
+* **Copy Glyph to Clipboard** Does as advertised. The preview glyph to the clipboard so you can paste it somewhere else. This glyph has decomposed components for obvious reasons, it has floating point coordinates and width.
 * **Default Location** will take the Preview home to the default location. In case you get lost in crazy extrapolations. 
 * **Random Location** will take the Preview to a random location in the designspace. In case you want to see the sights. If you have **Allow Extrapolation** checked, the random location will extrapolate a bit over the axis extremes.
 
 ## Math Model
 
-* **MutatorMath / VarLib** switches between the math model used for the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
-* **Allow Extrapolation** Restrict the dragging with the Navigator tool to the axis extremes, or go wild. Variable font technology can not extrapolate. But in type design it can be a useful thing. Again, do what you need.
+* **MutatorMath / VarLib** switches between the mathematical model used to calculate the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
+* **Allow Extrapolation** Constraing the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design og type, extrapolation can be a useful thing. Again, do what you need.
 
 ## Appearance
 
@@ -70,7 +70,7 @@ A popup list has all the interesting locations in the current designspace. Sourc
 * LongBoard is **fast** and exists because of the work, support and help from [Frederik Berlaen](https://github.com/sponsors/typemytype) and [Tal Leming](https://github.com/sponsors/typesupply)
 * Roberto Arista also worked on an earlier edition of this project.
 * GitHub Sponsors who make the development of open, specialised, shared tools like this possible. In the small industry of type design, that makes a huge difference. You, or the company you work for, can sponsor open source type design tools like this. [My sponsor page is here.](https://github.com/sponsors/letterror)
-* And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardIcon_icon.png) for your support, feedback and patience!
+* And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardIcon_icon.png) users for your support, feedback and patience!
 
 Visit [LettError.com](https://letterror.com) to see my fonts and other work. Take a look at [Superpolator.com](https://superpolator.com) for the theory of building designspaces for variable fonts, animated examples of interpolation problems and some tips on drawing for interpolation.
 

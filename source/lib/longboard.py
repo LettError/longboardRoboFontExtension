@@ -552,8 +552,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         prefs = []
         interactionSourcesPref = self.operator.lib.get(interactionSourcesLibKey)
         #interactionSourcesPref = None    # reset prefs
+        # check if there are any new axes that aren't listed in the prefs
+        seen = []
         if interactionSourcesPref is not None:
             for axisName, interaction in interactionSourcesPref:
+                seen.append(axisName)
                 v = 2
                 roundedValue = None
                 if interaction == "horizontal":
@@ -569,6 +572,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     else:
                         roundedValue = round(value, self.axisValueDigits)
                 items.append(dict(textValue=axisName, popUpValue=v, axisValue=roundedValue))
+            for axisRecord in self.operator.axes:
+                # an axis may have been added since the last time
+                # this pref was saved. So check if we have seen all of them.
+                if axisRecord.name in seen: continue
+                aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
+                items.append(dict(textValue=axisRecord.name, popUpValue=2, axisValue=aD_default))
         else:
             v = 0
             for axisObject in self.operator.getOrderedContinuousAxes():
