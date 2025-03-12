@@ -172,48 +172,49 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         content = """
 
-        (interestingLocations ...) @interestingLocationsPopup
+        (interestingLocations ...)      @interestingLocationsPopup
 
-        | ----------------- | @axesTable
+        | ----------------- |           @axesTable
         | xx | tf | pu | av |
         | ----------------- |
 
-        * Accordion: Tools @tools 
+        * Accordion: Tools              @tools 
 
         > ----
-        > * HorizontalStack @toolsStack        
-        >> * VerticalStack @toolsColumn1
-        >>> (Add New Instance) @addInstance
-        >>> (Make Preview UFO) @makePreviewUFO
-        >>> (Copy Glyph to Clipboard) @copyClipboard
-        >> * VerticalStack @toolsColumn2
-        >>> (Default Location) @resetPreview
-        >>> (Random Location) @randomPreview
+        > * HorizontalStack             @toolsStack        
+        >> * VerticalStack              @toolsColumn1
+        >>> (Add New Instance)          @addInstance
+        >>> (Make Preview UFO)          @makePreviewUFO
+        >>> (Copy Glyph to Clipboard)   @copyClipboard
+        >> * VerticalStack              @toolsColumn2
+        >>> (Default Location)          @resetPreview
+        >>> (Random Location)           @randomPreview
 
         > ----
-        > * HorizontalStack @geometryStack       
-        >> (X MutatorMath X| VarLib ) @mathModelButton
-        >> [ ] Allow Extrapolation @allowExtrapolation
+        > * HorizontalStack             @geometryStack       
+        >> (X MutatorMath X| VarLib )   @mathModelButton
+        >> [ ] Allow Extrapolation      @allowExtrapolation
 
         > ----
-        > * HorizontalStack @appearanceStack       
-        >> * VerticalStack @appearanceColumn1
+        > * HorizontalStack             @appearanceStack       
+        >> * VerticalStack              @appearanceColumn1
         #>> Align Preview & Sources
         >>> ( Left |X Center X| Right ) @alignPreviewButton
-        >>> --X-- Haziness @hazeSlider
-        >> * VerticalStack @appearanceColumn2
-        >>> [X] Show Measurements @showMeasurements
-        >>> [X] Show Kinks @showKinks
-        >>> [ ] Show Sources @showSources
-        >>> [ ] Show Vectors @showPoints
+        >>> --X-- Haziness              @hazeSlider
+        >> * VerticalStack              @appearanceColumn2
+        >>> [X] Show Measurements       @showMeasurements
+        >>> [X] Show Kinks              @showKinks
+        >>> [ ] Show Sources            @showSources
+        >>> [ ] Show Vectors            @showPoints
 
-        * Accordion: About @about                         
-        >* HorizontalStack @links        
-        >>(⚙️ LettError) @lettErrorButton
-        >>(👨‍🚀 Designspace Help) @designspaceTheoryButton
-        >>(🩷 Sponsor) @gitHubSponsorButton
+        * Accordion: About              @about     
+        > ----
+        > ((( 􀍟 LettError | 􁅁 Designspace Help | 􀊵 Sponsor )))   @linksButton
+
         """
         wantUIWidth = 400
+        halfWidth = wantUIWidth / 2
+        thirdWidth = wantUIWidth / 3
         descriptionData = dict(
             axesTable=dict(
                 height=100,
@@ -243,24 +244,73 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     ),
                 ],
             ),
+            toolsColumn1=dict(
+                width=halfWidth
+            ),
+            toolsColumn2=dict(
+                width=halfWidth
+            ),
+            appearanceColumn1=dict(
+                width=halfWidth,
+            ),
             tools=dict(
-                closed=True
+                closed=True,
+                width=wantUIWidth,
             ),
             about=dict(
-                closed=True
+                closed=True,
+                width=wantUIWidth,
+            ),
+            links=dict(
+                width=wantUIWidth,
+                distribution="fillProportionally",
             ),
             hazeSlider=dict(
                 minValue=0.08,
                 maxValue=0.8,
-                value=0.5
-                ),
+                value=0.5,
+                width='fill',
+            ),
+            mathModelButton=dict(
+                width=halfWidth,
+                segmentDescriptions=[
+                    {"width": halfWidth/2, "text": "MutatorMath"},
+                    {"width": halfWidth/2, "text": "VarLib"},
+                ],
+            ),
+            alignPreviewButton=dict(
+                width=halfWidth,
+                segmentDescriptions=[
+                    {"width": halfWidth/3, "text": "Left"},
+                    {"width": halfWidth/3, "text": "Center"},
+                    {"width": halfWidth/3, "text": "Right"},
+                ]
+            ),
+            addInstance=dict(
+                width='fill',
+            ),
+            makePreviewUFO=dict(
+                width='fill',
+            ),
+            resetPreview=dict(
+                width='fill',
+            ),
+            randomPreview=dict(
+                width='fill',
+            ),
+            copyClipboard=dict(
+                width='fill',
+            ),
+            interestingLocationsPopup=dict(
+                width='fill',
+            ),
         )
         self.w = ezui.EZWindow(
             title= f"🛹",
             content=content,
             descriptionData=descriptionData,
             controller=self,
-            size=(wantUIWidth, "auto")
+            size='auto'
         )
         self.operator = None
         self.axisValueDigits = 3
@@ -291,17 +341,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.setTitle("🛹")
         self.enableActionButtons(False)
     
-    def lettErrorButtonCallback(self, sender):
-        # open the LettError page
-        webbrowser.open("https://letterror.com")
+    
+    def linksButtonCallback(self, sender):
+        links = ["https://letterror.com", "https://superpolator.com", "https://github.com/sponsors/letterror"]
+        webbrowser.open(links[sender.get()])
 
-    def gitHubSponsorButtonCallback(self, sender):
-        # open the LettError GitHub sponsor page because it would be nice.
-        webbrowser.open("https://github.com/sponsors/letterror")
-
-    def designspaceTheoryButtonCallback(self, sender):
-        # open the Superpolator designspace theory site
-        webbrowser.open("https://superpolator.com")
         
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
