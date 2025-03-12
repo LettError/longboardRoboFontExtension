@@ -214,7 +214,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         """
         wantUIWidth = 400
         halfWidth = wantUIWidth / 2
-        thirdWidth = wantUIWidth / 3
         descriptionData = dict(
             axesTable=dict(
                 height=100,
@@ -263,7 +262,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             ),
             links=dict(
                 width=wantUIWidth,
-                distribution="fillProportionally",
             ),
             hazeSlider=dict(
                 minValue=0.08,
@@ -1471,16 +1469,7 @@ registerSubscriberEvent(
 )
 
 
-
-
 nt = LongboardNavigatorTool()
 installTool(nt)
 
-
-
-
 OpenWindow(LongBoardUIController) 
-
-
-
-
