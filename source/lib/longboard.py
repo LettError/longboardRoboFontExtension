@@ -511,6 +511,16 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def destroy(self):
         # LongBoardUIController
         unregisterGlyphEditorSubscriber(LongboardEditorView)
+    
+    def getAxisScales(self):
+        scales = {}
+        if self.operator is None:
+            return 0.025    # !
+        for aD in self.operator.axes:
+            aD_minimum = aD.map_forward(aD.minimum)
+            aD_maximum = aD.map_forward(aD.maximum)
+            scales[aD.name] = (aD_maximum - aD_minimum)
+        return scales
         
     def navigatorLocationChanged(self, info):
         # LongBoardUIController
@@ -534,21 +544,23 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         editorObject = data['editor']
 
         unit = {}
-        unitScale = 100
         for axis in self.w.getItem("axesTable").get():
             name = axis['textValue']
             if axis['popUpValue'] == 0:     # horizontal
-                #unit[name] = unitScale/(data['horizontal'] / viewScale)
                 unit[name] = data['horizontal']
             elif axis['popUpValue'] == 1:     # vertical
-                #unit[name] = unitScale/(data['vertical'] / viewScale)
                 unit[name] = data['vertical']
             # and for ignore we don't pass anything
-        extreme = []      
+        axisScales = self.getAxisScales()
+        extreme = []
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
                 value = editorObject.previewLocation_dragging[axisName]
-                value += .025 * offset    # subjective value! 
+                #value += .025 * offset    # subjective value! 
+                value += (offset/1000) * axisScales[axisName]/25 # slightly less subjective
+                # Explanation: the 1000 is a value that relates to the screen and the number
+                # of pixels we want to move in order to travel along the whole axis.
+                # The axisScales[axisName] value is the span of the min axis / max axis value.
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
