@@ -28,6 +28,7 @@ from mojo.events import (
 )
 
 from mojo.extensions import ExtensionBundle
+from mutatorMath.objects.mutator import Location
 
 from mojo.subscriber import (
     Subscriber,
@@ -52,6 +53,7 @@ navigatorInactiveEventKey = eventID + "navigatorInctive.event"
 toolID = "com.letterror.longboard"
 containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
+statsContainerKey = toolID + ".stats.layer"
 
 #KeyError:                 'com.letterror.longboard.settingsChanged.event'
 #settingsChangedEventKey     com.letterror.longboard.settingsChanged.event
@@ -204,6 +206,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> * VerticalStack              @appearanceColumn2
         >>> [X] Show Measurements       @showMeasurements
         >>> [X] Show Kinks              @showKinks
+        >>> [X] Show Stats              @showStats
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showPoints
 
@@ -556,7 +559,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
                 value = editorObject.previewLocation_dragging[axisName]
-                #value += .025 * offset    # subjective value! 
+                # @@ how to  handle anisotropy here?
+                if type(value) == tuple: 
+                    value = value[0]
                 value += (offset/1000) * axisScales[axisName]/25 # slightly less subjective
                 # Explanation: the 1000 is a value that relates to the screen and the number
                 # of pixels we want to move in order to travel along the whole axis.
@@ -714,6 +719,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         value = sender.get()==1
         postEvent(settingsChangedEventKey, showKinks=value)
     
+    def showStatsCallback(self, sender):
+        # LongBoardUIController
+        value = sender.get()==1
+        postEvent(settingsChangedEventKey, showStats=value)
+    
     def hazeSliderCallback(self, sender):
         # LongBoardUIController
         value = sender.get()
@@ -747,8 +757,8 @@ class LongboardEditorView(Subscriber):
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
             kinkModel = (1,.2,0, haze)
-            self.measurementStrokeColor = (0, 1, 1, 1)
-            self.measurementFillColor = (0, 1, 1, 1)
+            self.measurementStrokeColor = (0, .8, 1, 1)
+            self.measurementFillColor = (0, .8, 1, 1)
         else:
             haze = 1 - self.longBoardHazeFactor
             fillModel = (.5,.5,.5, haze)
@@ -793,6 +803,7 @@ class LongboardEditorView(Subscriber):
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showKinks = True
+        self.showchange = True
         self.previewAlign = "center"
         self.wantsVarLib = False
         self.showSources = False
@@ -802,21 +813,29 @@ class LongboardEditorView(Subscriber):
         self.centerFactor = 0    # -1: left, 0: center, 1: right
         self.showPoints = False
         self.showMeasurements = True
+        self.showStats = True
+        self.statsRemoveOverlap = True
         self.useDiscreteLocationOfCurrentFont = True
         self.navigatorToolPosition = None
         self.navigatorToolProgress = None
         self.dragging = False
         self.preparePreview = False
+        self.startInstanceStats = None   # when we start dragging, the initial surface area
         self._lastEventTime = None
         self.previewLocation_dragging = None    # local editing copy of the DSE2 preview location
+        self._bar = "-" * 22
+        self._dots = len(self._bar)*"."
 
         glyphEditor = self.getGlyphEditor()
         # container for all layers in the editor window
         self.editorContainer = glyphEditor.extensionContainer(containerKey, location="middleground")
         self.measurementContainer = glyphEditor.extensionContainer(containerKey, location="foreground")
+
         # container for all layers in the preview window
         # note: different use of the word Preview
         self.previewContainer = glyphEditor.extensionContainer(previewContainerKey, location="preview")
+        self.statsContainer = glyphEditor.extensionContainer(statsContainerKey, location="foreground")
+        self.statsTextLayer = self.statsContainer.appendBaseSublayer()
 
         self.previewPathLayer = self.previewContainer.appendPathSublayer(
             strokeColor = self.previewStrokeColor,
@@ -877,6 +896,7 @@ class LongboardEditorView(Subscriber):
         # starting drag
         if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
         self.dragging = True
+        self.startInstanceStats = None
         self.setColors(active=True)
         self.navigatorToolPosition = None
         # get the designspace current location and make a local copy
@@ -931,8 +951,6 @@ class LongboardEditorView(Subscriber):
         # @@_mouse_drag_updating_data
         dx = self.navigatorToolProgress[0]/timeSinceLastEvent
         dy = self.navigatorToolProgress[1]/timeSinceLastEvent
-        #print("shiftDown", info.get("deviceState").get('shiftDown'))
-        #print("optionDown", info.get("deviceState").get('optionDown'))
         if info.get("deviceState").get('shiftDown') == 131072:
             # constrain the movements.
             # shift pressed: clamp x or y
@@ -986,6 +1004,7 @@ class LongboardEditorView(Subscriber):
         self.editorContainer.clearSublayers()
         self.previewContainer.clearSublayers()
         self.measurementContainer.clearSublayers()
+        self.statsContainer.clearSublayers()
         self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
@@ -1017,15 +1036,6 @@ class LongboardEditorView(Subscriber):
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
-    # Reference: more designspace subscriber events
-    #    designspaceEditorSourcesDidAddSource
-    #    designspaceEditorSourcesDidRemoveSource
-    #    designspaceEditorSourcesDidChanged
-    
-    #    designspaceEditorAxesDidChange
-    #    designspaceEditorAxesDidAddAxis
-    #    designspaceEditorAxesDidRemoveAxis
-    
     def designspaceEditorSourceGlyphDidChange(self, info):
         # LongboardEditorView
         # rebuild all the layers
@@ -1223,6 +1233,18 @@ class LongboardEditorView(Subscriber):
             for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
                 sourceGlyph.draw(sourcePen)
             self.sourcesPathLayer.setPath(sourcePen.path)
+    
+    def collectGlyphStats(self, glyph):
+        # stuff a couple of glyp dimensions in a location
+        temp = glyph.copy()
+        if self.statsRemoveOverlap:
+            temp.removeOverlap()
+        return Location(
+                width= temp.width,
+                leftMargin= temp.leftMargin,
+                rightMargin= temp.rightMargin,
+                area= temp.area
+            )
         
     def updateInstanceOutline(self, rebuild=True):
         # LongboardEditorView
@@ -1235,6 +1257,8 @@ class LongboardEditorView(Subscriber):
             # for the first time. Clear out everything, rebuild everything
             self.instancePathLayer.clearSublayers()
             self.previewPathLayer.clearSublayers()
+            self.statsContainer.clearSublayers()
+            self.statsTextLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
             self.kinkPathLayer.setPath(None)
             self.marginsPathLayer.setPath(None)
@@ -1274,6 +1298,7 @@ class LongboardEditorView(Subscriber):
             
             previewGlyph = RGlyph()
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
+            xMin, yMin, xMax, yMax = previewGlyph.bounds
 
             shift = 0
             if self.previewAlign == "center":
@@ -1284,6 +1309,39 @@ class LongboardEditorView(Subscriber):
                 #xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = editorGlyph.width-previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
+
+            if self.showStats:
+                if self.startInstanceStats == None:
+                    self.startInstanceStats = self.collectGlyphStats(previewGlyph)
+                else:
+                    currentStats = self.collectGlyphStats(previewGlyph)
+                    diff = currentStats - self.startInstanceStats
+                    wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
+                    wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
+                    wdthAbs = currentStats['width'] - self.startInstanceStats['width']
+                    statsText = f"⌘\n{self._bar}\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
+                    statsText += f"\n{self._dots}"
+                    for axisName, axisValue in self.previewLocation_dragging.items():
+                        statsText += f"\n+\t{axisName}\t{axisValue:>9.4f}"
+                    #@@
+                    statsTextLayerName = f'statsText_{editorGlyph.name}'
+                    statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
+                    textPos = (shift, yMin-30)
+                    if statsTextLayer is None:
+                        statsTextLayer= self.statsContainer.appendTextLineSublayer(
+                            name=statsTextLayerName,
+                            font="Menlo-Regular",
+                            position=textPos,
+                            pointSize=11,
+                            fillColor=self.measurementFillColor,
+                            horizontalAlignment="left",
+                            )
+                    if statsTextLayer is not None:
+                        statsTextLayer._tabs = (100, 100, 100, 100)
+                        statsTextLayer.setText(statsText)
+                        statsTextLayer.setPosition(textPos)
+            else:
+                self.startInstanceStats = None
 
             # @@
             self.updateSourceVectors(previewGlyph)
@@ -1417,6 +1475,8 @@ class LongboardEditorView(Subscriber):
             self.showMeasurements = info["showMeasurements"]
         if info["showKinks"] is not None:
             self.showKinks = info["showKinks"]
+        if info["showStats"] is not None:
+            self.showStats = info["showStats"]
         if info["previewAlign"] is not None:
             self.previewAlign = info["previewAlign"]
         if info["longBoardHazeFactor"] is not None:
@@ -1442,7 +1502,8 @@ def uiSettingsExtractor(subscriber, info):
         info["showSources"] = lowLevelEvent.get("showSources")
         info["showPoints"] = lowLevelEvent.get("showPoints")
         info["showMeasurements"] = lowLevelEvent.get("showMeasurements")
-        info["showKinks"] = lowLevelEvent.get("showKinks")
+        info["showKinks"] = lowLevelEvent.get("showKinks", False)
+        info["showStats"] = lowLevelEvent.get("showStats", False)
         info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
         info["previewAlign"] = lowLevelEvent.get("previewAlign")
