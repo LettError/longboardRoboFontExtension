@@ -757,8 +757,8 @@ class LongboardEditorView(Subscriber):
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
             kinkModel = (1,.2,0, haze)
-            self.measurementStrokeColor = (0, .8, 1, 1)
-            self.measurementFillColor = (0, .8, 1, 1)
+            self.measurementStrokeColor = (0, .8, 1, haze)    # 1
+            self.measurementFillColor = (0, .8, 1, haze)    # 1
         else:
             haze = 1 - self.longBoardHazeFactor
             fillModel = (.5,.5,.5, haze)
@@ -835,7 +835,7 @@ class LongboardEditorView(Subscriber):
         # note: different use of the word Preview
         self.previewContainer = glyphEditor.extensionContainer(previewContainerKey, location="preview")
         self.statsContainer = glyphEditor.extensionContainer(statsContainerKey, location="foreground")
-        self.statsTextLayer = self.statsContainer.appendBaseSublayer()
+        #self.statsTextLayer = self.statsContainer.appendBaseSublayer()
 
         self.previewPathLayer = self.previewContainer.appendPathSublayer(
             strokeColor = self.previewStrokeColor,
@@ -958,7 +958,11 @@ class LongboardEditorView(Subscriber):
                 dy = 0
             else:
                 dx = 0
-        if info.get("deviceState").get('optionDown') == 524288:
+        #if info.get("deviceState").get('optionDown') == 524288:
+        #    # option pressed: slower speed
+        #    dx *= 0.125
+        #    dy *= 0.125
+        if info.get("deviceState").get('commandDown') == 1048576:
             # option pressed: slower speed
             dx *= 0.125
             dy *= 0.125
@@ -1249,7 +1253,6 @@ class LongboardEditorView(Subscriber):
     def updateInstanceOutline(self, rebuild=True):
         # LongboardEditorView
         # everything necessary to update the preview, time sensitive
-
         if self.darkMode != inDarkMode():
             self.darkMode = not self.darkMode
         if rebuild:
@@ -1258,7 +1261,7 @@ class LongboardEditorView(Subscriber):
             self.instancePathLayer.clearSublayers()
             self.previewPathLayer.clearSublayers()
             self.statsContainer.clearSublayers()
-            self.statsTextLayer.clearSublayers()
+            #self.statsTextLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
             self.kinkPathLayer.setPath(None)
             self.marginsPathLayer.setPath(None)
@@ -1319,11 +1322,15 @@ class LongboardEditorView(Subscriber):
                     wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
                     wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
                     wdthAbs = currentStats['width'] - self.startInstanceStats['width']
-                    statsText = f"⌘\n{self._bar}\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
-                    statsText += f"\n{self._dots}"
+                    statsText = f"{self._bar}\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
+                    statsText += f"\n{self._bar}"
                     for axisName, axisValue in self.previewLocation_dragging.items():
-                        statsText += f"\n+\t{axisName}\t{axisValue:>9.4f}"
-                    #@@
+                        if type(axisValue) == tuple:
+                            # could be anisotropic
+                            statsText += f"\n+\t{axisName}\t{axisValue[0]:>9.4f}"
+                        else:
+                            statsText += f"\n+\t{axisName}\t{axisValue:>9.4f}"
+                    statsText += f"\n{self._bar}"
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
                     textPos = (shift, yMin-30)
@@ -1337,7 +1344,6 @@ class LongboardEditorView(Subscriber):
                             horizontalAlignment="left",
                             )
                     if statsTextLayer is not None:
-                        statsTextLayer._tabs = (100, 100, 100, 100)
                         statsTextLayer.setText(statsText)
                         statsTextLayer.setPosition(textPos)
             else:
@@ -1461,25 +1467,26 @@ class LongboardEditorView(Subscriber):
                 
     def showSettingsChanged(self, info):
         # LongboardEditorView
-        if info["allowExtrapolation"] is not None:
+        # subscriber callback
+        if info.get("allowExtrapolation") is not None:
             self.allowExtrapolation = info["allowExtrapolation"]
-        if info["showPreview"] is not None:
+        if info.get("showPreview") is not None:
             self.showPreview = info["showPreview"]
-        if info["showSources"] is not None:
+        if info.get("showSources") is not None:
             self.showSources = info["showSources"]
-        if info["showPoints"] is not None:
+        if info.get("showPoints") is not None:
             self.showPoints = info["showPoints"]
-        if info["wantsVarLib"] is not None:
+        if info.get("wantsVarLib") is not None:
             self.wantsVarLib = info["wantsVarLib"]
-        if info["showMeasurements"] is not None:
+        if info.get("showMeasurements") is not None:
             self.showMeasurements = info["showMeasurements"]
-        if info["showKinks"] is not None:
+        if info.get("showKinks") is not None:
             self.showKinks = info["showKinks"]
-        if info["showStats"] is not None:
+        if info.get("showStats") is not None:
             self.showStats = info["showStats"]
-        if info["previewAlign"] is not None:
+        if info.get("previewAlign") is not None:
             self.previewAlign = info["previewAlign"]
-        if info["longBoardHazeFactor"] is not None:
+        if info.get("longBoardHazeFactor") is not None:
             self.longBoardHazeFactor = info["longBoardHazeFactor"]
         self.setPreferences()
         self.updateSourcesOutlines(rebuild=True)
@@ -1493,6 +1500,7 @@ def uiSettingsExtractor(subscriber, info):
     info["showPoints"] = None
     info["showMeasurements"] = None
     info["showKinks"] = None
+    info["showStats"] = None
     info["wantsVarLib"] = None
     info["longBoardHazeFactor"] = None
     info['previewAlign'] = None
@@ -1502,8 +1510,8 @@ def uiSettingsExtractor(subscriber, info):
         info["showSources"] = lowLevelEvent.get("showSources")
         info["showPoints"] = lowLevelEvent.get("showPoints")
         info["showMeasurements"] = lowLevelEvent.get("showMeasurements")
-        info["showKinks"] = lowLevelEvent.get("showKinks", False)
-        info["showStats"] = lowLevelEvent.get("showStats", False)
+        info["showKinks"] = lowLevelEvent.get("showKinks")
+        info["showStats"] = lowLevelEvent.get("showStats")
         info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
         info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
         info["previewAlign"] = lowLevelEvent.get("previewAlign")

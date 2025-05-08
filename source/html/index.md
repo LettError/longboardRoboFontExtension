@@ -5,19 +5,19 @@
 # Longboard
 
 
-![LongBoard in the Glypheditor](screen_20241102_A.png)
+![LongBoard in the Glypheditor](screen_20250508_A.png)
 
 Longboard draws previews of the current designspace in the glyph window.
 It is the successor to the Skateboard and Superpolator tools.
 
 This is for RoboFont 4.5+, you need to have the [DesignspaceEditor2 extension](https://github.com/LettError/designSpaceRoboFontExtension) installed. Longboard will activate when you have a designspace open in DSE2, and a glyph edit window for one of the sources.
 
-![The LongBoard UI](screen_20241112.png)
+![The LongBoard UI](screen_20250508.png)
 
 Use Longboard to smoothly explore your designspaces in the glyph editor. A single mouse drag can manipulate as many axis values as you want. To set it up, use the table at the top of the LongBoard Window. It lists the **continuous axes** available for exploring. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will change width axis values. And vertical movements will correspond to change in weight axis values.
 
 * **Drag + Shift Key:** constrain movement to horizontal or vertical.
-* **Drag + Option Key:** a slower response for more precise movements. If you want to get that one specific value.
+* **Drag + Command Key:** a slower response for more precise movements. If you want to get that one specific value.
 
 Longboard takes the values for the **discrete axes** from the source you're currently looking at. So if your designspace has a continuous weight and a discrete italic axis, Longboard will show upright weight variations in the upright sources, and italic weight variations in italic sources.
 
@@ -40,7 +40,7 @@ A popup list has all the interesting locations in the current designspace. Sourc
 ## Math Model
 
 * **MutatorMath / VarLib** switches between the mathematical model used to calculate the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
-* **Allow Extrapolation** Constraing the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design og type, extrapolation can be a useful thing. Again, do what you need.
+* **Allow Extrapolation** Clip the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design of type, extrapolation can be a useful thing. Again, do what you need.
 
 ## Appearance
 
@@ -49,6 +49,7 @@ A popup list has all the interesting locations in the current designspace. Sourc
 
 * **Show Measurements** This applies the RoboFont Measure tool to the preview and shows the dimensions in blue. This way you can search for very specific stems, for instance.
 * **Show Kinks** For point types marked **smooth** this highlights curve sections where the incoming and outgoing lines are no longer smooth.
+* **Show Stats** Present some statistics about the preview instance while dragging: change in surface area, change in width, absolute change in width (in em units) as well as the axis values of the preview location.
 * **Show Sources** draws all the sources for this glyph as well as the preview. This can be useful, but it can also be quite busy, visually. You be the judge and choose what you need. The sources are drawn centered under the current glyph.
 * **Show Vectors** draws a vector between the sources and the preview. So you can see how the points get pulled around. This can be useful to spot compatibility issues.
 
@@ -77,5 +78,6 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 ## Versions
 * 1.3.2 Initial public release
 * 1.3.3 Add Kink reporting, UI tweaks.
-* 1.3.4 Fix issue with default location
+* 1.3.4 Fix issue with default location.
 * 1.3.5 Add some modifier key features.
+* 1.3.6 Add stats, new screenshots.
