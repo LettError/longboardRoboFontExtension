@@ -5,14 +5,14 @@
 # Longboard
 
 
-![LongBoard in the Glypheditor](screen_20250508_A.png)
+![LongBoard in the Glypheditor](screen_20250509_S.png)
 
 Longboard draws previews of the current designspace in the glyph window.
 It is the successor to the Skateboard and Superpolator tools.
 
 This is for RoboFont 4.5+, you need to have the [DesignspaceEditor2 extension](https://github.com/LettError/designSpaceRoboFontExtension) installed. Longboard will activate when you have a designspace open in DSE2, and a glyph edit window for one of the sources.
 
-![The LongBoard UI](screen_20250508.png)
+![The LongBoard UI](screen_20250509.png)
 
 Use Longboard to smoothly explore your designspaces in the glyph editor. A single mouse drag can manipulate as many axis values as you want. To set it up, use the table at the top of the LongBoard Window. It lists the **continuous axes** available for exploring. Use the pop up menu to choose a **direction** for the Navigator. For istance, in this image, horizontal movements of the navigator tool will change width axis values. And vertical movements will correspond to change in weight axis values.
 

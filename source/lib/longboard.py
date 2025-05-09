@@ -206,9 +206,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         > ----
         > * HorizontalStack             @appearanceStack       
         >> * VerticalStack              @appearanceColumn1
-        #>> Align Preview & Sources
-        >>> ( Left |X Center X| Right ) @alignPreviewButton
-        >>> ( Left |X Center X| Right ) @alignStatsButton
+        >>> ( {align.horizontal.left.fill} |X {align.horizontal.center.fill} X| {align.horizontal.right.fill} ) @alignPreviewButton
+        >>> ( {text.alignleft} |X {text.aligncenter} X| {text.alignright} ) @alignStatsButton
         >>> --X-- Haziness              @hazeSlider
         >> * VerticalStack              @appearanceColumn2
         >>> [X] Show Measurements       @showMeasurements
@@ -292,20 +291,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             #( 􀥖 |X 􀥗 X| 􀥘 ) @alignPreviewButton
             alignPreviewButton=dict(
                 width=halfWidth,
-                segmentDescriptions=[
-                    {"width": halfWidth/3, "text": "􀥖"},
-                    {"width": halfWidth/3, "text": "􀥗"},
-                    {"width": halfWidth/3, "text": "􀥘"},
-                ]
             ),
             #( 􀥖 |X 􀥗 X| 􀥘 ) @alignStatsButton  􀌀􀌁􀌂
             alignStatsButton=dict(
                 width=halfWidth,
-                segmentDescriptions=[
-                    {"width": halfWidth/3, "text": "􀌀"},
-                    {"width": halfWidth/3, "text": "􀌁"},
-                    {"width": halfWidth/3, "text": "􀌂"},
-                ]
             ),
             addInstance=dict(
                 width='fill',
