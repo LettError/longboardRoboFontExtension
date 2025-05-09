@@ -361,6 +361,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info['alignPreview'] = ['left', 'center', 'right'][self.w.getItem('alignPreviewButton').get()]
         info['toolsClosed'] = self.w.getItem('tools').getClosed()
         info['aboutClosed'] = self.w.getItem('about').getClosed()
+        # the preferred drag directions
+        info['dragDirections'] = self.operator.lib[interactionSourcesLibKey]
         #print('collectSettingsState', info)
         return info
     
@@ -608,7 +610,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         scales = {}
         if self.operator is None:
             return 0.025    # !
-        for aD in self.operator.axes:
+        for aD in self.operator.getOrderedContinuousAxes():
             aD_minimum = aD.map_forward(aD.minimum)
             aD_maximum = aD.map_forward(aD.maximum)
             scales[aD.name] = (aD_maximum - aD_minimum)
@@ -720,7 +722,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     else:
                         roundedValue = round(value, self.axisValueDigits)
                 items.append(dict(textValue=axisName, popUpValue=v, axisValue=roundedValue))
-            for axisRecord in self.operator.axes:
+            for axisRecord in self.operator.getOrderedContinuousAxes():
                 # an axis may have been added since the last time
                 # this pref was saved. So check if we have seen all of them.
                 if axisRecord.name in seen: continue
@@ -835,9 +837,9 @@ class LongboardEditorView(Subscriber):
             fillModel = (.5,.5,.5, .8*haze)
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
-            kinkModel = (1,.2,0, haze)
-            self.measurementStrokeColor = (0, .8, 1, haze)    # 1
-            self.measurementFillColor = (0, .8, 1, haze)    # 1
+            kinkModel = (1,0,0, haze)
+            self.measurementStrokeColor = (0, .8, 1, 1)
+            self.measurementFillColor = (0, .8, 1, 1)
         else:
             haze = 1 - self.longBoardHazeFactor
             fillModel = (.5,.5,.5, haze)
@@ -1121,6 +1123,7 @@ class LongboardEditorView(Subscriber):
         self.updateInstanceOutline(rebuild=True)
     
     def glyphEditorWillClose(self, info):
+        #@@
         # https://robofont.com/documentation/reference/api/mojo/mojo-subscriber/
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
@@ -1333,7 +1336,6 @@ class LongboardEditorView(Subscriber):
                 leftMargin= temp.leftMargin,
                 rightMargin= temp.rightMargin,
                 area= temp.area,
-                
             )
         
     def updateInstanceOutline(self, rebuild=True):
@@ -1395,7 +1397,6 @@ class LongboardEditorView(Subscriber):
                 shift = .5*editorGlyph.width-.5*previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
             elif self.previewAlign == "right":
-                #xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = editorGlyph.width-previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
 
@@ -1403,13 +1404,13 @@ class LongboardEditorView(Subscriber):
                 if self.startInstanceStats == None:
                     self.startInstanceStats = self.collectGlyphStats(previewGlyph)
                 else:
+                    statsText = ""
                     currentStats = self.collectGlyphStats(previewGlyph)
                     diff = currentStats - self.startInstanceStats
                     wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
                     wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
                     wdthAbs = currentStats['width'] - self.startInstanceStats['width']
-                    statsText = f"{self._bar}\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
-                    statsText += f"\n{self._bar}"
+                    statsText += f"\n\n{self._bar}"
                     for axisName, axisValue in self.previewLocation_dragging.items():
                         if type(axisValue) == tuple:
                             # could be anisotropic
@@ -1417,9 +1418,10 @@ class LongboardEditorView(Subscriber):
                         else:
                             statsText += f"\n+\t{axisName}\t{axisValue:>9.4f}"
                     statsText += f"\n{self._bar}"
+                    statsText += f"\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
-                    textPos = (shift, yMin-30)
+                    textPos = (shift, yMin)
                     if statsTextLayer is None:
                         statsTextLayer= self.statsContainer.appendTextLineSublayer(
                             name=statsTextLayerName,
