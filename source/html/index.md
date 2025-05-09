@@ -34,13 +34,13 @@ A popup list has all the interesting locations in the current designspace. Sourc
 * **Add New Instance** Creates a new instance in the current designspace. Family name is copied from the default source. Style name is created from axis names and values. Use DSE2 to set all the other parameters. LongBoard warns you if the location is already in use.
 * **Make Preview UFO** This creates a new UFO for the current preview location. RoboFont opens the UFO when it is ready. This UFO can be used for inspection, proofing, detailed measuring and so on. The UFOs are saved in the **preview** folder next to the designspace file. This will **not** make a new instance in the designspace. If you want to add the preview UFO as a source, you have to move it out of the Previews folder and rename it. Mote: Preview UFOs have floating point coordinates, metrics and kerning because precision.
 * **Copy Glyph to Clipboard** Does as advertised. The preview glyph to the clipboard so you can paste it somewhere else. This glyph has decomposed components for obvious reasons, it has floating point coordinates and width.
-* **Default Location** will take the Preview home to the default location. In case you get lost in crazy extrapolations. 
+* **Default Location** will take the Preview home to the default location. In case you get lost in crazy extrapolations.
 * **Random Location** will take the Preview to a random location in the designspace. In case you want to see the sights. If you have **Allow Extrapolation** checked, the random location will extrapolate a bit over the axis extremes.
 
 ## Math Model
 
 * **MutatorMath / VarLib** switches between the mathematical model used to calculate the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
-* **Allow Extrapolation** Clip the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design of type, extrapolation can be a useful thing. Again, do what you need.
+* **Allow Extrapolation** Clip the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design of type, extrapolation can be a useful thing. Again, do what you need. Extrapolated previews will be shown in a bigger dash.
 
 ## Appearance
 
@@ -49,7 +49,7 @@ A popup list has all the interesting locations in the current designspace. Sourc
 
 * **Show Measurements** This applies the RoboFont Measure tool to the preview and shows the dimensions in blue. This way you can search for very specific stems, for instance.
 * **Show Kinks** For point types marked **smooth** this highlights curve sections where the incoming and outgoing lines are no longer smooth.
-* **Show Stats** Present some statistics about the preview instance while dragging: change in surface area, change in width, absolute change in width (in em units) as well as the axis values of the preview location.
+* **Show Stats** Collect and show some statistics about the preview instance while dragging: change in surface area, change in width, absolute change in width (in em units) as well as the axis values of the preview location.
 * **Show Sources** draws all the sources for this glyph as well as the preview. This can be useful, but it can also be quite busy, visually. You be the judge and choose what you need. The sources are drawn centered under the current glyph.
 * **Show Vectors** draws a vector between the sources and the preview. So you can see how the points get pulled around. This can be useful to spot compatibility issues.
 
@@ -65,11 +65,12 @@ A popup list has all the interesting locations in the current designspace. Sourc
 
 * The mapping of mouse movements to axis values is done with a Subjective Algorithm™. That means "it works here with the designspaces I tested it with", As long as your axes have values that are roughly on a 0 - 1000 scale it will be fine, but there may be some speed issues if the axes are on a smaller scale, like 0 - 1. I may follow up on that.Otherwise, use your common sense.
 * With this tool most of the functionality that I wrote for **Skateboard** and indeed **Superolator** should be available again. **DesignspaceEditor2** does all the heavy lifting. Longboard is a clever visualiser tool on top of DSE. I hope you enjoy. Feel free to check the GitHub sponsor pages.
+* The preview location is stored in the designspace lib. If you have several designspaces open, each will have its own preview location. Save the designspace if you want to keep this location for the next session. 
 
 ## Thanks!
 
 * LongBoard is **fast** and exists because of the work, support and help from [Frederik Berlaen](https://github.com/sponsors/typemytype) and [Tal Leming](https://github.com/sponsors/typesupply)
-* Roberto Arista also worked on an earlier edition of this project.
+* Roberto Arista also worked on an earlier edition of this project. Also many thanks to Ryan Bugden for help and suggestions.
 * GitHub Sponsors who make the development of open, specialised, shared tools like this possible. In the small industry of type design, that makes a huge difference. You, or the company you work for, can sponsor open source type design tools like this. [My sponsor page is here.](https://github.com/sponsors/letterror)
 * And all Skateboard 🛹 and Superpolator ![Superolator icon, sorta.](longboardIcon_icon.png) users for your support, feedback and patience!
 
