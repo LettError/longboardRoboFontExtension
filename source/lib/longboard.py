@@ -16,6 +16,8 @@ import math, time, os, traceback
 import AppKit
 import webbrowser
 
+from random import randint, choice, random
+
 import merz
 
 from mojo.UI import inDarkMode
@@ -27,7 +29,7 @@ from mojo.events import (
     postEvent
 )
 
-from mojo.extensions import ExtensionBundle
+from mojo.extensions import ExtensionBundle, getExtensionDefault, setExtensionDefault
 from mutatorMath.objects.mutator import Location
 
 from mojo.subscriber import (
@@ -55,12 +57,13 @@ containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
 statsContainerKey = toolID + ".stats.layer"
 
-#KeyError:                 'com.letterror.longboard.settingsChanged.event'
-#settingsChangedEventKey     com.letterror.longboard.settingsChanged.event
-
 settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
+
+# Extension defaults example
+#https://robofont.com/documentation/how-tos/mojo/read-write-defaults/
+extensionDefaultKey = toolID + ".defaults"
 
 from mojo.events import (
     installTool,
@@ -105,6 +108,7 @@ def findKinks(glyph, res=3):
                 if dp < 1:
                     results.append((ci, p1, p2, p3, (1-dp)*100))
     return results
+    
     
 class LongboardNavigatorTool(BaseEventTool):
     def setup(self):
@@ -197,22 +201,25 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> (X MutatorMath X| VarLib )   @mathModelButton
         >> [ ] Allow Extrapolation      @allowExtrapolation
 
+        * Accordion: Show              @appearance 
+
         > ----
         > * HorizontalStack             @appearanceStack       
         >> * VerticalStack              @appearanceColumn1
-        #>> Align Preview & Sources
-        >>> ( Left |X Center X| Right ) @alignPreviewButton
+        >>> ( {align.horizontal.left.fill} |X {align.horizontal.center.fill} X| {align.horizontal.right.fill} ) @alignPreviewButton
+        >>> ( {text.alignleft} |X {text.aligncenter} X| {text.alignright} ) @alignStatsButton
         >>> --X-- Haziness              @hazeSlider
         >> * VerticalStack              @appearanceColumn2
         >>> [X] Show Measurements       @showMeasurements
         >>> [X] Show Kinks              @showKinks
         >>> [X] Show Stats              @showStats
         >>> [ ] Show Sources            @showSources
-        >>> [ ] Show Vectors            @showPoints
+        >>> [ ] Show Vectors            @showVectors
 
         * Accordion: About              @about     
         > ----
         > ((( 􀍟 LettError | 􁅁 Designspace Help | 􀊵 Sponsor )))   @linksButton
+        #> (Test Apply State)           @testApplyState
 
         """
         wantUIWidth = 400
@@ -235,6 +242,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                         cellDescription=dict(
                             cellType="PopUpButton",
                             cellClassArguments=dict(
+                                # 􀞒􀞓􂁣􂁤􂁥
+                                # 􂁦􂁧􂁨
                                 items=["Horizontal", "Vertical", "Ignore"]
                             )
                         )
@@ -279,13 +288,13 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     {"width": halfWidth/2, "text": "VarLib"},
                 ],
             ),
+            #( 􀥖 |X 􀥗 X| 􀥘 ) @alignPreviewButton
             alignPreviewButton=dict(
                 width=halfWidth,
-                segmentDescriptions=[
-                    {"width": halfWidth/3, "text": "Left"},
-                    {"width": halfWidth/3, "text": "Center"},
-                    {"width": halfWidth/3, "text": "Right"},
-                ]
+            ),
+            #( 􀥖 |X 􀥗 X| 􀥘 ) @alignStatsButton  􀌀􀌁􀌂
+            alignStatsButton=dict(
+                width=halfWidth,
             ),
             addInstance=dict(
                 width='fill',
@@ -318,18 +327,125 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.interestingLocations = []    # list of the locations stored in the popup;
         self.enableActionButtons(False)
         self.wantsVarLib = False
-    
+        self.previewAlign = "center"
+            
     def enableActionButtons(self, state):
         # enable or disable the action buttons
-        self.w.getItem("addInstance").enable(state)
-        self.w.getItem("makePreviewUFO").enable(state)
-        self.w.getItem("copyClipboard").enable(state)
-        self.w.getItem("makePreviewUFO").enable(state)
-        self.w.getItem("resetPreview").enable(state)
-        self.w.getItem("randomPreview").enable(state)
-        self.w.getItem("interestingLocationsPopup").enable(state)
-        self.w.getItem("mathModelButton").enable(state)
-        self.w.getItem("alignPreviewButton").enable(state)
+        try:
+            self.w.getItem("addInstance").enable(state)
+            self.w.getItem("makePreviewUFO").enable(state)
+            self.w.getItem("copyClipboard").enable(state)
+            self.w.getItem("makePreviewUFO").enable(state)
+            self.w.getItem("resetPreview").enable(state)
+            self.w.getItem("randomPreview").enable(state)
+            self.w.getItem("interestingLocationsPopup").enable(state)
+            self.w.getItem("mathModelButton").enable(state)
+            self.w.getItem("alignPreviewButton").enable(state)
+            self.w.getItem("alignStateButton").enable(state)
+        except AttributeError:
+            pass
+    
+    def collectSettingsState(self, save=False):
+        # collect the state of all checkers to store in defaults
+        # goal: store all settings in this dict
+        # save dict to defaults
+        # read dict from prefs
+        # exchange dict between controller and subscriber
+        # save=True: don't include values that start with underscore
+        # Such values need to go to the subscriber, but don't need to be saved.
+        #@@
+        info = {}
+        info["allowExtrapolation"] = self.w.getItem('allowExtrapolation').get()==1
+        info["showSources"] = self.w.getItem('showSources').get()==1
+        info["showVectors"] = self.w.getItem('showVectors').get()==1
+        info["showMeasurements"] = self.w.getItem('showMeasurements').get()==1
+        info["showKinks"] = self.w.getItem('showKinks').get()==1
+        info["showStats"] = self.w.getItem('showStats').get()==1
+        info["wantsVarLib"] = self.w.getItem("mathModelButton").get() == 1
+        info['hazeSlider'] = self.w.getItem('hazeSlider').get()
+        info['alignPreview'] = ['left', 'center', 'right'][self.w.getItem('alignPreviewButton').get()]
+        info['alignStats'] = ['left', 'center', 'right'][self.w.getItem('alignStatsButton').get()]
+        info['toolsClosed'] = self.w.getItem('tools').getClosed()
+        info['appearanceClosed'] = self.w.getItem('tools').getClosed()
+        info['aboutClosed'] = self.w.getItem('about').getClosed()
+        if not save:
+            # values for the subscriber, but not for the defaults
+            # the preferred drag directions
+            if self.operator is not None:
+                info['_dragDirections'] = self.operator.lib[interactionSourcesLibKey]
+                continuousAxisNames = []
+                discreteAxisNames = []
+                for aD in self.operator.getOrderedContinuousAxes():
+                    continuousAxisNames.append(aD.name)    
+                for aD in self.operator.getOrderedDiscreteAxes():
+                    discreteAxisNames.append(aD.name)
+                info['_discreteAxisNames'] = discreteAxisNames
+                info['_continuousAxisNames'] = continuousAxisNames
+        return info
+    
+    def applySettingsState(self, info):
+        # apply all the values in the info dict to their places
+        self.w.getItem('allowExtrapolation').set(info["allowExtrapolation"])
+        self.w.getItem('showSources').set(info["showSources"])
+        self.w.getItem('showVectors').set(info["showVectors"])
+        self.w.getItem('showMeasurements').set(info["showMeasurements"])
+        self.w.getItem('showKinks').set(info["showKinks"])
+        self.w.getItem('showStats').set(info["showStats"])
+        self.w.getItem('hazeSlider').set(info["hazeSlider"])
+        self.w.getItem('tools').setClosed(info["toolsClosed"])
+        self.w.getItem('appearance').setClosed(info["appearanceClosed"])
+        self.w.getItem('about').setClosed(info["aboutClosed"])
+        if info["wantsVarLib"]:
+            self.w.getItem("mathModelButton").set(1)
+        else:
+            self.w.getItem("mathModelButton").set(0)
+        if 'alignPreview' in info:
+            value = None
+            if info['alignPreview'] == "left":
+                value = 0
+            elif info['alignPreview'] == "center":
+                value = 1
+            elif info['alignPreview'] == "right":
+                value = 2
+            if value != None:
+                self.w.getItem('alignPreviewButton').set(value)
+
+        if 'alignStats' in info:
+            if info['alignStats'] == "left":
+                value = 0
+            elif info['alignStats'] == "center":
+                value = 1
+            elif info['alignStats'] == "right":
+                value = 2
+            if value != None:
+                self.w.getItem('alignStatsButton').set(value)
+                
+    def testApplyStateCallback(self, sender=None):
+        # randomise settings for the checkers
+        print("randomising all the settings")
+        def chooseOne():
+            return randint(0, 1)
+        def chooseTrue():
+            return choice([True, False])
+        def chooseFactor():
+            return random()
+        testSettingsDict = {
+            'allowExtrapolation': chooseOne(),
+            'previewAlign': 'center',
+            'showSources': chooseOne(),
+            'showVectors': chooseOne(),
+            'showMeasurements': chooseOne(),
+            'showKinks': chooseOne(),
+            'showStats': chooseOne(),
+            'wantsVarLib': chooseTrue(),
+            'hazeSlider': chooseFactor(),
+            'alignPreview': choice(['left', 'center', 'right']),
+            'alignStats': choice(['left', 'center', 'right']),
+            'toolsClosed': chooseTrue(),
+            'aboutClosed': chooseTrue(),
+            'appearanceClosed': chooseTrue(),
+            }
+        self.applySettingsState(testSettingsDict)
         
     def locationToString(self, location):
         t = []
@@ -342,12 +458,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.setTitle("🛹")
         self.enableActionButtons(False)
     
-    
     def linksButtonCallback(self, sender):
         links = ["https://letterror.com", "https://superpolator.com", "https://github.com/sponsors/letterror"]
         webbrowser.open(links[sender.get()])
 
-        
     def makePreviewUFOCallback(self, sender):
         # Make a ufo for the current preview location and open it up.
         # Why in longboard and not in DSE? Because it is more about evaluating the
@@ -403,9 +517,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         OpenFont(ufoPath, showInterface=True)
 
     def alignPreviewButtonCallback(self, sender):
-        alignState = ['left', 'center', 'right'][sender.get()]
-        postEvent(settingsChangedEventKey, previewAlign=alignState)
-          
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+
+    def alignStatsButtonCallback(self, sender):
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+
     def mathModelButtonCallback(self, sender):
         # switch to the preferred math model for the previews
         # 0: calculate preview with MutatorMath
@@ -415,7 +531,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         else:
             self.wantsVarLib = True
         # LongBoardUIController
-        postEvent(settingsChangedEventKey, wantsVarLib=self.wantsVarLib)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
             
     def copyClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
@@ -510,16 +626,29 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         self.w.open()
         registerGlyphEditorSubscriber(LongboardEditorView)
+        # look for settings in the extention defaults
+        extensionDefaults = getExtensionDefault(extensionDefaultKey, fallback=None)
+        if extensionDefaults is not None:
+            self.applySettingsState(extensionDefaults)
+        # maybe a glypheditor is open, maybe not.
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
     def destroy(self):
         # LongBoardUIController
+        # store the settings as extension defaults
+        setExtensionDefault(extensionDefaultKey, self.collectSettingsState(save=True))
         unregisterGlyphEditorSubscriber(LongboardEditorView)
     
+    def glyphEditorDidSetGlyph(self, info):
+        # LongBoardUIController
+        # send the settings info to the subscriber
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+
     def getAxisScales(self):
         scales = {}
         if self.operator is None:
             return 0.025    # !
-        for aD in self.operator.axes:
+        for aD in self.operator.getOrderedContinuousAxes():
             aD_minimum = aD.map_forward(aD.minimum)
             aD_maximum = aD.map_forward(aD.maximum)
             scales[aD.name] = (aD_maximum - aD_minimum)
@@ -631,7 +760,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     else:
                         roundedValue = round(value, self.axisValueDigits)
                 items.append(dict(textValue=axisName, popUpValue=v, axisValue=roundedValue))
-            for axisRecord in self.operator.axes:
+            for axisRecord in self.operator.getOrderedContinuousAxes():
                 # an axis may have been added since the last time
                 # this pref was saved. So check if we have seen all of them.
                 if axisRecord.name in seen: continue
@@ -691,48 +820,75 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     
     def showPreviewCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, showPreview=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
     def showSourcesCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, showSources=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
-    def showPointsCallback(self, sender):
+    def showVectorsCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, showPoints=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
     def allowExtrapolationCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, allowExtrapolation=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, showMeasurements=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
     def showKinksCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()==1
-        postEvent(settingsChangedEventKey, showKinks=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
     def showStatsCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()==1
-        postEvent(settingsChangedEventKey, showStats=value)
+        # if the stats are not showing, disable the stats align button.
+        self.w.getItem('alignStatsButton').enable(self.w.getItem('showStats').get())
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
     def hazeSliderCallback(self, sender):
         # LongBoardUIController
-        value = sender.get()
-        postEvent(settingsChangedEventKey, longBoardHazeFactor=value)
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
 
 
 
-
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
 
 
 
@@ -756,9 +912,9 @@ class LongboardEditorView(Subscriber):
             fillModel = (.5,.5,.5, .8*haze)
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
-            kinkModel = (1,.2,0, haze)
-            self.measurementStrokeColor = (0, .8, 1, haze)    # 1
-            self.measurementFillColor = (0, .8, 1, haze)    # 1
+            kinkModel = (1,0,0, haze)
+            self.measurementStrokeColor = (0, .8, 1, 1)
+            self.measurementFillColor = (0, .8, 1, 1)
         else:
             haze = 1 - self.longBoardHazeFactor
             fillModel = (.5,.5,.5, haze)
@@ -803,6 +959,7 @@ class LongboardEditorView(Subscriber):
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showKinks = True
+        self.showVectors = False
         self.showchange = True
         self.previewAlign = "center"
         self.wantsVarLib = False
@@ -811,20 +968,30 @@ class LongboardEditorView(Subscriber):
         self.sourceGlyphs = []
         #self.centerAllGlyphs = True
         self.centerFactor = 0    # -1: left, 0: center, 1: right
-        self.showPoints = False
+        self.showVectors = False
         self.showMeasurements = True
         self.showStats = True
+        self.statsAlign = "center"
         self.statsRemoveOverlap = True
         self.useDiscreteLocationOfCurrentFont = True
         self.navigatorToolPosition = None
         self.navigatorToolProgress = None
         self.dragging = False
+        self.draggingSlowModeFactor = 0.05
         self.preparePreview = False
         self.startInstanceStats = None   # when we start dragging, the initial surface area
         self._lastEventTime = None
         self.previewLocation_dragging = None    # local editing copy of the DSE2 preview location
         self._bar = "-" * 22
         self._dots = len(self._bar)*"."
+        self.estimatedStatsTextWidth = 22 * 10
+
+        self.allowExtrapolation = False
+        self.longBoardHazeFactor = 0.5
+        self.discreteAxisNames = []
+        self.continuousAxisNames = []
+        self.dragDirections = {}
+
 
         glyphEditor = self.getGlyphEditor()
         # container for all layers in the editor window
@@ -958,14 +1125,11 @@ class LongboardEditorView(Subscriber):
                 dy = 0
             else:
                 dx = 0
-        #if info.get("deviceState").get('optionDown') == 524288:
-        #    # option pressed: slower speed
-        #    dx *= 0.125
-        #    dy *= 0.125
+            print('contrained?', dx, dy)
         if info.get("deviceState").get('commandDown') == 1048576:
             # option pressed: slower speed
-            dx *= 0.125
-            dy *= 0.125
+            dx *= self.draggingSlowModeFactor
+            dy *= self.draggingSlowModeFactor
         data = {
                 'editor': self, 
                 'previewLocation': self.previewLocation_dragging,
@@ -1037,6 +1201,12 @@ class LongboardEditorView(Subscriber):
                             ds.setPreviewLocation(previewContinuous)
         else:
             ds.setPreviewLocation(previewContinuous)
+        self.updateSourcesOutlines(rebuild=True)
+        self.updateInstanceOutline(rebuild=True)
+    
+    def glyphEditorWillClose(self, info):
+        #@@
+        # https://robofont.com/documentation/reference/api/mojo/mojo-subscriber/
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
@@ -1247,7 +1417,7 @@ class LongboardEditorView(Subscriber):
                 width= temp.width,
                 leftMargin= temp.leftMargin,
                 rightMargin= temp.rightMargin,
-                area= temp.area
+                area= temp.area,
             )
         
     def updateInstanceOutline(self, rebuild=True):
@@ -1309,7 +1479,6 @@ class LongboardEditorView(Subscriber):
                 shift = .5*editorGlyph.width-.5*previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
             elif self.previewAlign == "right":
-                #xMin, yMin, xMax, yMax = previewGlyph.bounds
                 shift = editorGlyph.width-previewGlyph.width
                 previewGlyph.moveBy((shift, 0))
 
@@ -1317,23 +1486,48 @@ class LongboardEditorView(Subscriber):
                 if self.startInstanceStats == None:
                     self.startInstanceStats = self.collectGlyphStats(previewGlyph)
                 else:
+                    statsText = ""
                     currentStats = self.collectGlyphStats(previewGlyph)
                     diff = currentStats - self.startInstanceStats
                     wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
                     wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
                     wdthAbs = currentStats['width'] - self.startInstanceStats['width']
-                    statsText = f"{self._bar}\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
-                    statsText += f"\n{self._bar}"
+                    statsText += f"\n\n{self._bar}"
+                    continousAxesText = ""
+                    discreteAxesText = ""
                     for axisName, axisValue in self.previewLocation_dragging.items():
-                        if type(axisValue) == tuple:
-                            # could be anisotropic
-                            statsText += f"\n+\t{axisName}\t{axisValue[0]:>9.4f}"
-                        else:
-                            statsText += f"\n+\t{axisName}\t{axisValue:>9.4f}"
+                        dragIndicator = ""
+                        # to show which drag direction this axis responds to
+                        if axisName in self.continuousAxisNames:
+                            for aN, dD in self.dragDirections:
+                                if aN == axisName:
+                                    if dD == "horizontal":
+                                        dragIndicator = "-"
+                                    elif dD == "vertical":
+                                        dragIndicator = "|"
+                                    else:
+                                        dragIndicator = "✕"
+                            if type(axisValue) == tuple:
+                                # could be anisotropic
+                                continousAxesText += f"\n{dragIndicator}\t{axisName[:7]}\t{axisValue[0]:>9.4f}"
+                            else:
+                                continousAxesText += f"\n{dragIndicator}\t{axisName[:7]}\t{axisValue:>9.4f}"
+                        elif axisName in self.discreteAxisNames:
+                            discreteAxesText += f"\n:\t{axisName[:7]}\t{int(axisValue):>13d}"
+                    statsText += continousAxesText
+                    statsText += discreteAxesText
                     statsText += f"\n{self._bar}"
+                    statsText += f"\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
-                    textPos = (shift, yMin-30)
+                    # this needs a bit of work..
+                    # ideally we'd calculate the width of the string, in local glyph editor units?
+                    if self.statsAlign == "left":
+                        textPos = (shift, yMin)
+                    elif self.statsAlign == "right":
+                        textPos = (previewGlyph.width + shift, yMin)
+                    elif self.statsAlign == "center":
+                        textPos = (0.5 * previewGlyph.width + shift, yMin)
                     if statsTextLayer is None:
                         statsTextLayer= self.statsContainer.appendTextLineSublayer(
                             name=statsTextLayerName,
@@ -1341,7 +1535,7 @@ class LongboardEditorView(Subscriber):
                             position=textPos,
                             pointSize=11,
                             fillColor=self.measurementFillColor,
-                            horizontalAlignment="left",
+                            horizontalAlignment=self.statsAlign,
                             )
                     if statsTextLayer is not None:
                         statsTextLayer.setText(statsText)
@@ -1397,7 +1591,7 @@ class LongboardEditorView(Subscriber):
                         )
                 previewLayer.setPath(path)
                 
-                if self.showPoints:
+                if self.showVectors:
                     # 03 on curve markers on instance outline
                     for im, m in enumerate(cpPreview.onCurves):
                         # layer append or update? 14 @@
@@ -1453,7 +1647,7 @@ class LongboardEditorView(Subscriber):
                     self.marginsPathLayer.setPath(marginLinePath.path)
 
     def updateSourceVectors(self, previewGlyph):
-        if self.showPoints:
+        if self.showVectors:
             collectorPen = CollectorPen({})
             previewGlyph.draw(collectorPen)
             vectorPath = merz.MerzPen()
@@ -1468,59 +1662,43 @@ class LongboardEditorView(Subscriber):
     def showSettingsChanged(self, info):
         # LongboardEditorView
         # subscriber callback
-        if info.get("allowExtrapolation") is not None:
-            self.allowExtrapolation = info["allowExtrapolation"]
-        if info.get("showPreview") is not None:
-            self.showPreview = info["showPreview"]
-        if info.get("showSources") is not None:
-            self.showSources = info["showSources"]
-        if info.get("showPoints") is not None:
-            self.showPoints = info["showPoints"]
-        if info.get("wantsVarLib") is not None:
-            self.wantsVarLib = info["wantsVarLib"]
-        if info.get("showMeasurements") is not None:
-            self.showMeasurements = info["showMeasurements"]
-        if info.get("showKinks") is not None:
-            self.showKinks = info["showKinks"]
-        if info.get("showStats") is not None:
-            self.showStats = info["showStats"]
-        if info.get("previewAlign") is not None:
-            self.previewAlign = info["previewAlign"]
-        if info.get("longBoardHazeFactor") is not None:
-            self.longBoardHazeFactor = info["longBoardHazeFactor"]
+        settings = info['lowLevelEvents'][0].get('settings')
+        # what to expect in this settings dict from controller.collectSettingsState
+        #showSettingsChanged {
+            # 'allowExtrapolation': False, 
+            # 'showSources': False, 
+            # 'showVectors': True, 
+            # 'showMeasurements': False, 
+            # 'showKinks': True, 
+            # 'showStats': False, 
+            # 'wantsVarLib': False, 
+            # 'hazeSlider': 0.4161512297839245, 
+            # 'alignPreview': 'left', 
+            # 'alignStats': 'left', 
+            # 'toolsClosed': False, 
+            # 'aboutClosed': True
+            # }
+        self.allowExtrapolation = settings["allowExtrapolation"]
+        self.showSources = settings["showSources"]
+        self.showVectors = settings["showVectors"]
+        self.wantsVarLib = settings["wantsVarLib"]
+        self.showMeasurements = settings["showMeasurements"]
+        self.showKinks = settings["showKinks"]
+        self.showStats = settings["showStats"]
+        self.previewAlign = settings["alignPreview"]
+        self.statsAlign = settings["alignStats"]
+        self.longBoardHazeFactor = settings["hazeSlider"]
+        self.discreteAxisNames = settings.get("_discreteAxisNames", [])
+        self.continuousAxisNames = settings.get("_continuousAxisNames", [])
+        self.dragDirections = settings.get('_dragDirections', {})
         self.setPreferences()
         self.updateSourcesOutlines(rebuild=True)
-        self.updateInstanceOutline(rebuild=True)
-
-def uiSettingsExtractor(subscriber, info):
-    # crikey there as to be a more efficient way to do this.
-    info["allowExtrapolation"] = None
-    info["showPreview"] = None
-    info["showSources"] = None
-    info["showPoints"] = None
-    info["showMeasurements"] = None
-    info["showKinks"] = None
-    info["showStats"] = None
-    info["wantsVarLib"] = None
-    info["longBoardHazeFactor"] = None
-    info['previewAlign'] = None
-    for lowLevelEvent in info["lowLevelEvents"]:
-        info["allowExtrapolation"] = lowLevelEvent.get("allowExtrapolation")
-        info["showPreview"] = lowLevelEvent.get("showPreview")
-        info["showSources"] = lowLevelEvent.get("showSources")
-        info["showPoints"] = lowLevelEvent.get("showPoints")
-        info["showMeasurements"] = lowLevelEvent.get("showMeasurements")
-        info["showKinks"] = lowLevelEvent.get("showKinks")
-        info["showStats"] = lowLevelEvent.get("showStats")
-        info["wantsVarLib"] = lowLevelEvent.get("wantsVarLib")
-        info["longBoardHazeFactor"] = lowLevelEvent.get("longBoardHazeFactor")
-        info["previewAlign"] = lowLevelEvent.get("previewAlign")
+        self.updateInstanceOutline(rebuild=True)        
 
 registerSubscriberEvent(
     subscriberEventName=settingsChangedEventKey,
     methodName="showSettingsChanged",
     lowLevelEventNames=[settingsChangedEventKey],
-    eventInfoExtractionFunction=uiSettingsExtractor,
     dispatcher="roboFont",
     delay=0,
     debug=True
