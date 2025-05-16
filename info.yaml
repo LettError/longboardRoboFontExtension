@@ -1,9 +1,9 @@
 name: Longboard
 developer: LettError
 developerURL: http://superpolator.com
-launchAtStartUp: false
-mainScript: ""
-version: "1.3.8"
+launchAtStartUp: true
+mainScript: run.py
+version: "1.3.9"
 addToMenu:
 - path: longboard.py
   preferredName: Longboard

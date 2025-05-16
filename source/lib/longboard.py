@@ -1736,3 +1736,8 @@ installTool(nt)
 def launcher():
     OpenWindow(LongBoardUIController) 
 
+
+if __name__ == '__main__':
+  launcher()
+
+
