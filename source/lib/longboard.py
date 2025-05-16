@@ -39,6 +39,8 @@ from mojo.subscriber import (
     registerSubscriberEvent
 )
 
+from mojo.roboFont import OpenWindow, RGlyph
+
 from fontTools.pens.basePen import BasePen
 from fontTools.ufoLib.glifLib import writeGlyphToString
 from fontTools.designspaceLib import InstanceDescriptor
@@ -1731,4 +1733,11 @@ registerSubscriberEvent(
 nt = LongboardNavigatorTool()
 installTool(nt)
 
-OpenWindow(LongBoardUIController) 
+def launcher():
+    OpenWindow(LongBoardUIController) 
+
+
+if __name__ == '__main__':
+  launcher()
+
+
