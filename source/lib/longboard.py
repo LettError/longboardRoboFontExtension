@@ -58,6 +58,7 @@ toolID = "com.letterror.longboard"
 containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
 statsContainerKey = toolID + ".stats.layer"
+copiedGlyphLocationLibKey = toolID + ".location"
 
 settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
@@ -156,7 +157,7 @@ class CollectorPen(BasePen):
         
 def getLocationsForFont(font, doc):
     # theoretically, a single UFO can be a source in different discrete locations
-    discreteLocations = [] 
+    discreteLocations = []
     continuousLocations = []
     for s in doc.sources:
         if s.path == font.path:
@@ -167,6 +168,22 @@ def getLocationsForFont(font, doc):
                 continuousLocations.append(cl)
     return continuousLocations, discreteLocations
 
+def copyPreviewToClipboard(operator, useVarlib=True):
+    # copy the text of the current preview to the clipboard
+    currentPreviewLocation = operator.getPreviewLocation()
+    glyph = CurrentGlyph()
+    if glyph is None:
+        return None
+    name = glyph.name
+    mathGlyph = operator.makeOneGlyph(name, location=currentPreviewLocation, useVarlib=useVarlib)
+    if mathGlyph is not None:
+        clipboardGlyph = RGlyph()
+        mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
+        clipboardGlyph.lib[copiedGlyphLocationLibKey] = currentPreviewLocation
+        clipboardGlyph.copyToPasteboard()
+        
+        return True
+    return False
 
 
 
@@ -343,8 +360,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             self.w.getItem("interestingLocationsPopup").enable(state)
             self.w.getItem("mathModelButton").enable(state)
             self.w.getItem("alignPreviewButton").enable(state)
-            self.w.getItem("alignStateButton").enable(state)
+            self.w.getItem("hazeSlider").enable(state)
+            # make sure to remove items that are no longer part of the UI
+            # otherwise I have to bother Tal with dumb questions.
         except AttributeError:
+            print(f"LongBoard reports (b):")
+            print(traceback.format_exc())
             pass
     
     def collectSettingsState(self, save=False):
@@ -460,6 +481,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.setTitle("🛹")
         self.enableActionButtons(False)
     
+    def designspaceEditorDidOpenDesignspace(self, info):
+        print("designspaceEditorDidOpenDesignspace", info)
+        self.enableActionButtons(True)
+    
     def linksButtonCallback(self, sender):
         links = ["https://letterror.com", "https://superpolator.com", "https://github.com/sponsors/letterror"]
         webbrowser.open(links[sender.get()])
@@ -537,15 +562,8 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             
     def copyClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
-        currentPreviewLocation = self.operator.getPreviewLocation()
-        glyph = CurrentGlyph()
-        if glyph is None: return
-        name = glyph.name
-        mathGlyph = self.operator.makeOneGlyph(name, location=currentPreviewLocation, useVarlib=self.wantsVarLib)
-        if mathGlyph is not None:
-            clipboardGlyph = RGlyph()
-            mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
-            clipboardGlyph.copyToPasteboard()
+        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib)
+        #print("copyClipboardCallback reports", result)
 
     def resetPreviewCallback(self, sender=None):
         # set the preview location to the default.
@@ -1139,6 +1157,23 @@ class LongboardEditorView(Subscriber):
                 'vertical': dy,
                 }
         publishEvent(navigatorLocationChangedEventKey, data=data)
+    
+    def glyphEditorWantsContextualMenuItems(self, info):
+        #@@ 
+        # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
+        #print("glyphEditorWantsContextualMenuItems", info)
+        myMenuItems = [
+            ("Copy Preview", self.copyPreviewMenuCallback),
+            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+        ]
+        info["itemDescriptions"].extend(myMenuItems)
+
+    def copyPreviewMenuCallback(self, sender):
+        # callback for the glypheditor contextual menu
+        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib)
+
+    #def option3Callback(self, sender):
+    #    print("option 3 selected")
 
     def relevantForThisEditor(self, info=None):
         # LongboardEditorView
