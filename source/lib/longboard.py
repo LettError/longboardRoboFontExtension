@@ -180,6 +180,7 @@ def copyPreviewToClipboard(operator, useVarlib=True, roundResult=True):
         clipboardGlyph = RGlyph()
         mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
         clipboardGlyph.lib[copiedGlyphLocationLibKey] = currentPreviewLocation
+        clipboardGlyph.clearGuides()
         if roundResult:
             clipboardGlyph.round()
         clipboardGlyph.copyToPasteboard()
