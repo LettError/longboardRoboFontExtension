@@ -70,6 +70,7 @@ extensionDefaultKey = toolID + ".defaults"
 
 from mojo.events import (
     installTool,
+    uninstallTool,
     BaseEventTool,
 )
 
@@ -180,7 +181,7 @@ def copyPreviewToClipboard(operator, useVarlib=True, roundResult=True):
         clipboardGlyph = RGlyph()
         mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
         clipboardGlyph.lib[copiedGlyphLocationLibKey] = currentPreviewLocation
-        clipboardGlyph.clearGuides()
+        clipboardGlyph.clearGuides()    # can be removed once fontparts fix is around
         if roundResult:
             clipboardGlyph.round()
         clipboardGlyph.copyToPasteboard()
@@ -344,6 +345,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             size='auto'
         )
         self.operator = None
+        self._navigatorTool = None
         self.axisValueDigits = 3
         self.interestingLocations = []    # list of the locations stored in the popup;
         self.enableActionButtons(False)
@@ -654,12 +656,17 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             self.applySettingsState(extensionDefaults)
         # maybe a glypheditor is open, maybe not.
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+        self._navigatorTool = LongboardNavigatorTool()
+        installTool(self._navigatorTool)
 
     def destroy(self):
         # LongBoardUIController
         # store the settings as extension defaults
         setExtensionDefault(extensionDefaultKey, self.collectSettingsState(save=True))
         unregisterGlyphEditorSubscriber(LongboardEditorView)
+        if self._navigatorTool is not None:
+            uninstallTool(self._navigatorTool)
+        self._navigatorTool = None
     
     def glyphEditorDidSetGlyph(self, info):
         # LongBoardUIController
@@ -1781,13 +1788,8 @@ registerSubscriberEvent(
     debug=True
 )
 
-
-nt = LongboardNavigatorTool()
-installTool(nt)
-
 def launcher():
     OpenWindow(LongBoardUIController) 
-
 
 if __name__ == '__main__':
   launcher()
