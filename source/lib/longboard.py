@@ -168,7 +168,7 @@ def getLocationsForFont(font, doc):
                 continuousLocations.append(cl)
     return continuousLocations, discreteLocations
 
-def copyPreviewToClipboard(operator, useVarlib=True):
+def copyPreviewToClipboard(operator, useVarlib=True, roundResult=True):
     # copy the text of the current preview to the clipboard
     currentPreviewLocation = operator.getPreviewLocation()
     glyph = CurrentGlyph()
@@ -180,8 +180,9 @@ def copyPreviewToClipboard(operator, useVarlib=True):
         clipboardGlyph = RGlyph()
         mathGlyph.extractGlyph(clipboardGlyph.asDefcon())
         clipboardGlyph.lib[copiedGlyphLocationLibKey] = currentPreviewLocation
+        if roundResult:
+            clipboardGlyph.round()
         clipboardGlyph.copyToPasteboard()
-        
         return True
     return False
 
@@ -560,9 +561,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
             
-    def copyClipboardCallback(self, sender):
+    def copyRoundedClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
-        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib)
+        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=True)
         #print("copyClipboardCallback reports", result)
 
     def resetPreviewCallback(self, sender=None):
@@ -1163,15 +1164,30 @@ class LongboardEditorView(Subscriber):
         # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
         #print("glyphEditorWantsContextualMenuItems", info)
         myMenuItems = [
-            ("Copy Preview", self.copyPreviewMenuCallback),
-            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+            ("Copy 🛹 Preview", self.copyPreviewMenuCallback),
+            ("Copy 🛹 Preview (Rounded)", self.copyRoundedPreviewMenuCallback),
+            "----",
+            ("Show 🎁 Location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
         ]
         info["itemDescriptions"].extend(myMenuItems)
 
     def copyPreviewMenuCallback(self, sender):
         # callback for the glypheditor contextual menu
-        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib)
+        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=False)
 
+    def copyRoundedPreviewMenuCallback(self, sender):
+        # copy the text of the current preview to the clipboard
+        result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=True)
+        #print("copyClipboardCallback reports", result)
+
+    def randomLocationMenuCallback(self, sender):
+        # callback for the glypheditor contextual menu
+        # pop to random location
+        randomLocation = self.operator.randomLocation(extrapolate=0.1)
+        self.operator.setPreviewLocation(randomLocation)
+        self.operator.changed()
+            
+        
     #def option3Callback(self, sender):
     #    print("option 3 selected")
 
