@@ -64,6 +64,8 @@ settingsChangedEventKey = toolID + ".settingsChanged.event"
 operatorChangedEventKey = toolID + ".operatorChanged.event"
 interactionSourcesLibKey = toolID + ".interactionSources"
 
+previewAlignOptions = ['leftOutside', 'left', 'center', 'right', 'rightOutside']
+
 # Extension defaults example
 #https://robofont.com/documentation/how-tos/mojo/read-write-defaults/
 extensionDefaultKey = toolID + ".defaults"
@@ -198,6 +200,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     
     def build(self):
         # LongBoardUIController
+        
+        #align.horizontal.right
+        #align.horizontal.left
+        
         content = """
 
         (interestingLocations ...)      @interestingLocationsPopup
@@ -228,7 +234,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         > ----
         > * HorizontalStack             @appearanceStack       
         >> * VerticalStack              @appearanceColumn1
-        >>> ( {align.horizontal.left.fill} |X {align.horizontal.center.fill} X| {align.horizontal.right.fill} ) @alignPreviewButton
+        >>> ( {align.horizontal.right} | {align.horizontal.left.fill} |X {align.horizontal.center.fill} X| {align.horizontal.right.fill} | {align.horizontal.left} ) @alignPreviewButton
         >>> ( {text.alignleft} |X {text.aligncenter} X| {text.alignright} ) @alignStatsButton
         >>> --X-- Haziness              @hazeSlider
         >> * VerticalStack              @appearanceColumn2
@@ -390,7 +396,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info["showStats"] = self.w.getItem('showStats').get()==1
         info["wantsVarLib"] = self.w.getItem("mathModelButton").get() == 1
         info['hazeSlider'] = self.w.getItem('hazeSlider').get()
-        info['alignPreview'] = ['left', 'center', 'right'][self.w.getItem('alignPreviewButton').get()]
+        info['alignPreview'] = previewAlignOptions[self.w.getItem('alignPreviewButton').get()]
         info['alignStats'] = ['left', 'center', 'right'][self.w.getItem('alignStatsButton').get()]
         info['toolsClosed'] = self.w.getItem('tools').getClosed()
         info['appearanceClosed'] = self.w.getItem('tools').getClosed()
@@ -428,12 +434,16 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             self.w.getItem("mathModelButton").set(0)
         if 'alignPreview' in info:
             value = None
-            if info['alignPreview'] == "left":
+            if info['alignPreview'] == "leftOutide":
                 value = 0
-            elif info['alignPreview'] == "center":
+            elif info['alignPreview'] == "left":
                 value = 1
-            elif info['alignPreview'] == "right":
+            elif info['alignPreview'] == "center":
                 value = 2
+            elif info['alignPreview'] == "right":
+                value = 3
+            elif info['alignPreview'] == "rightOutside":
+                value = 4
             if value != None:
                 self.w.getItem('alignPreviewButton').set(value)
 
@@ -466,7 +476,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             'showStats': chooseOne(),
             'wantsVarLib': chooseTrue(),
             'hazeSlider': chooseFactor(),
-            'alignPreview': choice(['left', 'center', 'right']),
+            'alignPreview': choice(previewAlignOptions),
             'alignStats': choice(['left', 'center', 'right']),
             'toolsClosed': chooseTrue(),
             'aboutClosed': chooseTrue(),
@@ -486,7 +496,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.enableActionButtons(False)
     
     def designspaceEditorDidOpenDesignspace(self, info):
-        print("designspaceEditorDidOpenDesignspace", info)
         self.enableActionButtons(True)
     
     def linksButtonCallback(self, sender):
@@ -567,7 +576,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def copyRoundedClipboardCallback(self, sender):
         # copy the text of the current preview to the clipboard
         result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=True)
-        #print("copyClipboardCallback reports", result)
 
     def resetPreviewCallback(self, sender=None):
         # set the preview location to the default.
@@ -969,7 +977,7 @@ class LongboardEditorView(Subscriber):
         self.vectorStrokeDash = (2, 2)
         self.sourceStrokeDash = (1, 2)
         self.instanceStrokeDash = (5, 2)
-        self.instanceStrokeDashExtrapolate = (5, 7)
+        self.instanceStrokeDashExtrapolate = (1, 3)
         self.instanceStrokeWidth = 1
         self.kinkStrokeDash = None    #(0, 16)
         self.kinkStrokeWidth = 4
@@ -1154,7 +1162,6 @@ class LongboardEditorView(Subscriber):
                 dy = 0
             else:
                 dx = 0
-            print('contrained?', dx, dy)
         if info.get("deviceState").get('commandDown') == 1048576:
             # option pressed: slower speed
             dx *= self.draggingSlowModeFactor
@@ -1170,7 +1177,6 @@ class LongboardEditorView(Subscriber):
     def glyphEditorWantsContextualMenuItems(self, info):
         #@@ 
         # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
-        #print("glyphEditorWantsContextualMenuItems", info)
         myMenuItems = [
             ("Copy 🛹 Preview", self.copyPreviewMenuCallback),
             ("Copy 🛹 Preview (Rounded)", self.copyRoundedPreviewMenuCallback),
@@ -1186,7 +1192,6 @@ class LongboardEditorView(Subscriber):
     def copyRoundedPreviewMenuCallback(self, sender):
         # copy the text of the current preview to the clipboard
         result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=True)
-        #print("copyClipboardCallback reports", result)
 
     def randomLocationMenuCallback(self, sender):
         # callback for the glypheditor contextual menu
@@ -1195,10 +1200,6 @@ class LongboardEditorView(Subscriber):
         self.operator.setPreviewLocation(randomLocation)
         self.operator.changed()
             
-        
-    #def option3Callback(self, sender):
-    #    print("option 3 selected")
-
     def relevantForThisEditor(self, info=None):
         # LongboardEditorView
         # check if the current font belongs to the current designspace.
@@ -1441,18 +1442,31 @@ class LongboardEditorView(Subscriber):
             # 
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
-            if self.previewAlign == "center":
-                # centering
-                shift = .5*editorGlyph.width-.5*sourceGlyph.width
-                sourceGlyph.moveBy((shift, 0))
-            elif self.previewAlign == "right":
-                shift = editorGlyph.width-sourceGlyph.width
-                sourceGlyph.moveBy((shift, 0))
+
+            shift = self.getPreviewOffsetForAlignOption(sourceGlyph.width, editorGlyph.width, self.previewAlign)
+            sourceGlyph.moveBy((shift, 0))
                 
             sourceGlyph.draw(sourcePen)
             self.sourcePens.append(sourcePen)
             self.sourceGlyphs.append(sourceGlyph)
-
+    
+    def getPreviewOffsetForAlignOption(self, sampleWidth, editorWidth, alignOption):
+        # based on align option, return an offset that will position the preview in the editor
+        shift = 0
+        if alignOption == "leftOutside":
+            # draw right aligned on the left margin of the editor glyph
+            shift = -sampleWidth
+        elif alignOption == "center":
+            # centering
+            shift = .5*editorWidth-.5*sampleWidth
+        elif alignOption == "right":
+            shift = editorWidth-sampleWidth
+        elif alignOption == "rightOutside":
+            shift = editorWidth
+        # note: there is no need for "Left"
+        # because that is the default position of the preview glyph
+        return shift
+        
     def updateSourcesOutlines(self, rebuild=True):
         # draw the previously collected source outlines to a single merz path
         if self.operator is None:
@@ -1534,14 +1548,8 @@ class LongboardEditorView(Subscriber):
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
             xMin, yMin, xMax, yMax = previewGlyph.bounds
 
-            shift = 0
-            if self.previewAlign == "center":
-                #xMin, yMin, xMax, yMax = previewGlyph.bounds
-                shift = .5*editorGlyph.width-.5*previewGlyph.width
-                previewGlyph.moveBy((shift, 0))
-            elif self.previewAlign == "right":
-                shift = editorGlyph.width-previewGlyph.width
-                previewGlyph.moveBy((shift, 0))
+            shift = self.getPreviewOffsetForAlignOption(previewGlyph.width, editorGlyph.width, self.previewAlign)
+            previewGlyph.moveBy((shift, 0))
 
             if self.showStats:
                 if self.startInstanceStats == None:
