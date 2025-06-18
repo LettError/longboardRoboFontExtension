@@ -58,6 +58,8 @@ toolID = "com.letterror.longboard"
 containerKey = toolID + ".layer"
 previewContainerKey = toolID + ".preview.layer"
 statsContainerKey = toolID + ".stats.layer"
+selectionContainerKey = toolID + ".selectionItems.layer"
+selectionTextContainerKey = toolID + ".selectionText.layer"
 copiedGlyphLocationLibKey = toolID + ".location"
 
 settingsChangedEventKey = toolID + ".settingsChanged.event"
@@ -239,6 +241,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> --X-- Haziness              @hazeSlider
         >> * VerticalStack              @appearanceColumn2
         >>> [X] Show Measurements       @showMeasurements
+        >>> [X] Show Selection          @showSelection
         >>> [X] Show Kinks              @showKinks
         >>> [X] Show Stats              @showStats
         >>> [ ] Show Sources            @showSources
@@ -391,6 +394,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info["allowExtrapolation"] = self.w.getItem('allowExtrapolation').get()==1
         info["showSources"] = self.w.getItem('showSources').get()==1
         info["showVectors"] = self.w.getItem('showVectors').get()==1
+        info["showSelection"] = self.w.getItem('showSelection').get()==1
         info["showMeasurements"] = self.w.getItem('showMeasurements').get()==1
         info["showKinks"] = self.w.getItem('showKinks').get()==1
         info["showStats"] = self.w.getItem('showStats').get()==1
@@ -471,6 +475,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             'previewAlign': 'center',
             'showSources': chooseOne(),
             'showVectors': chooseOne(),
+            'showSelection': chooseOne(),
             'showMeasurements': chooseOne(),
             'showKinks': chooseOne(),
             'showStats': chooseOne(),
@@ -867,6 +872,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
+    def showSelectionCallback(self, sender):
+        # LongBoardUIController
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+    
     def allowExtrapolationCallback(self, sender):
         # LongBoardUIController
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
@@ -966,11 +975,13 @@ class LongboardEditorView(Subscriber):
         self.kinkStrokeColor = kinkModel
         self.previewFillColor = fillModel
         self.previewStrokeColor = strokeModel
+        self.selectionFillColor = strokeModel
         
     def setPreferences(self):
         # LongboardEditorView
         self.darkMode = inDarkMode()
         self.measurementMarkerSize = 4
+        self.selectionMarkerSize = 6
         self.measurementStrokeWidth = 1
         self.measurementStrokeDash = (1, 3)
         self.previewStrokeDash = (4, 4)
@@ -984,6 +995,7 @@ class LongboardEditorView(Subscriber):
         self.instanceMarkerSize = 4
         self.sourceMarkerSize = 3
         self.measureLineCurveOffset = 50
+        self.selectionTextOffset = 10
         self.marginLineHeight = 50    # the height of the margin line in the preview
         self.setColors()
     
@@ -997,6 +1009,7 @@ class LongboardEditorView(Subscriber):
         self.showPreview = True
         self.showKinks = True
         self.showVectors = False
+        self.showSelection = True
         self.showchange = True
         self.previewAlign = "center"
         self.wantsVarLib = False
@@ -1005,7 +1018,6 @@ class LongboardEditorView(Subscriber):
         self.sourceGlyphs = []
         #self.centerAllGlyphs = True
         self.centerFactor = 0    # -1: left, 0: center, 1: right
-        self.showVectors = False
         self.showMeasurements = True
         self.showStats = True
         self.statsAlign = "center"
@@ -1038,6 +1050,8 @@ class LongboardEditorView(Subscriber):
         # container for all layers in the preview window
         # note: different use of the word Preview
         self.previewContainer = glyphEditor.extensionContainer(previewContainerKey, location="preview")
+        self.selectionContainer = glyphEditor.extensionContainer(selectionContainerKey, location="foreground")
+        self.selectionTextContainer = glyphEditor.extensionContainer(selectionTextContainerKey, location="foreground")
         self.statsContainer = glyphEditor.extensionContainer(statsContainerKey, location="foreground")
         #self.statsTextLayer = self.statsContainer.appendBaseSublayer()
 
@@ -1046,6 +1060,13 @@ class LongboardEditorView(Subscriber):
             strokeDash = self.previewStrokeDash,
             strokeWidth = 1,
             fillColor = None,
+        )
+        self.selectionLayer = self.editorContainer.appendPathSublayer(
+            strokeColor=self.vectorStrokeColor,
+            strokeWidth=self.instanceStrokeWidth,
+            fillColor = None,
+            strokeDash=self.vectorStrokeDash,
+            strokeCap="round",
         )
         self.instancePathLayer = self.editorContainer.appendPathSublayer(
             strokeColor=self.instanceStrokeColor,
@@ -1082,11 +1103,17 @@ class LongboardEditorView(Subscriber):
             strokeCap="round",
         )
         #self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
+        
         self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
         self.measurementsIntersectionsLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementMarkerLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementTextLayer = self.measurementContainer.appendBaseSublayer()
+        self.selectionTextLayer = self.selectionContainer.appendBaseSublayer()
 
+    def shouldShowSelection(self, *something):
+        # this work?
+        return True
+        
     def glyphEditorWillShowPreview(self, info):
         self.preparePreview = True
         self.updateInstanceOutline()
@@ -1235,6 +1262,8 @@ class LongboardEditorView(Subscriber):
         self.previewContainer.clearSublayers()
         self.measurementContainer.clearSublayers()
         self.statsContainer.clearSublayers()
+        self.selectionContainer.clearSublayers()
+        self.selectionTextContainer.clearSublayers()
         self.currentOperator = None
         
     def glyphEditorDidSetGlyph(self, info):
@@ -1267,11 +1296,14 @@ class LongboardEditorView(Subscriber):
         self.updateInstanceOutline(rebuild=True)
     
     def glyphEditorWillClose(self, info):
-        #@@
         # https://robofont.com/documentation/reference/api/mojo/mojo-subscriber/
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
+    def glyphEditorGlyphDidChangeSelection(self, info):
+        # LongBoardUIController @@
+        self.updateInstanceOutline(rebuild=True)
+    
     def designspaceEditorSourceGlyphDidChange(self, info):
         # LongboardEditorView
         # rebuild all the layers
@@ -1329,6 +1361,45 @@ class LongboardEditorView(Subscriber):
             kinkPen.lineTo(p3)
             kinkPen.endPath()
         self.kinkPathLayer.setPath(kinkPen.path)
+    
+    def drawSelection(self, editorGlyph, previewShift, previewGlyph):
+        # LongboardEditorView
+        # draw the points that are selected in the editorglyph
+        # in the previewGlyph.
+        selection = []
+        markers = []
+        pfp = editorGlyph.asFontParts()
+        for ci, c in enumerate(pfp.contours):
+            for pi, p in enumerate(c.points):
+                if p.selected:
+                    selection.append((ci, pi))
+                    previewPoint = previewGlyph.contours[ci].points[pi]
+                    markers.append((ci, pi, previewPoint.x, previewPoint.y))
+        for ci, pi, px, py in markers:
+            textPos = (px, py-self.selectionTextOffset)    #!
+            selectionLayerName = f"selectionMarker_{editorGlyph.name}_{ci}_{pi}"
+            selectionLayer = self.selectionLayer.getSublayer(selectionLayerName)
+            if selectionLayer is None:
+               selectionLayer = self.selectionLayer.appendSymbolSublayer(
+                   position=(px, py),
+                   imageSettings = dict(
+                       name="oval",
+                       size=(self.selectionMarkerSize, self.selectionMarkerSize),
+                       fillColor=self.selectionFillColor
+                       ),
+                   )
+            selectionTextLayerName = f"selectionText_{editorGlyph.name}_{ci}_{pi}"
+            selectionTextLayer = self.selectionTextLayer.getSublayer(selectionLayerName)
+            if selectionTextLayer is None:
+               selectionTextLayer = self.selectionTextLayer.appendTextLineSublayer(
+                    name=selectionTextLayerName,
+                    position=textPos,
+                    pointSize=9,
+                    fillColor=self.selectionFillColor,
+                    horizontalAlignment="center",
+                    )
+            selectionTextLayer.setText(f"{px:3.1f}, {py:3.1f}")
+            selectionTextLayer.setPosition(textPos)
         
     def drawMeasurements(self, editorGlyph, previewShift, previewGlyph):
         # LongboardEditorView
@@ -1515,6 +1586,8 @@ class LongboardEditorView(Subscriber):
         self.measurementMarkerLayer.clearSublayers()
         self.measurementsIntersectionsLayer.clearSublayers()
         self.measurementTextLayer.clearSublayers()
+        self.selectionLayer.clearSublayers()
+        self.selectionTextLayer.clearSublayers()
         
         if self.operator is None:
             return
@@ -1621,6 +1694,10 @@ class LongboardEditorView(Subscriber):
                 self.drawMeasurements(editorGlyph,  shift, previewGlyph)
             if self.showKinks:
                 self.findKinks(editorGlyph,  shift, previewGlyph)
+
+            # draw selected points
+            if self.showSelection:
+                self.drawSelection(editorGlyph, shift, previewGlyph)
 
             if self.showPreview:
                 # 01 stroke instance path in the editor layer
@@ -1750,6 +1827,7 @@ class LongboardEditorView(Subscriber):
         self.allowExtrapolation = settings["allowExtrapolation"]
         self.showSources = settings["showSources"]
         self.showVectors = settings["showVectors"]
+        self.showSelection = settings["showSelection"]
         self.wantsVarLib = settings["wantsVarLib"]
         self.showMeasurements = settings["showMeasurements"]
         self.showKinks = settings["showKinks"]
