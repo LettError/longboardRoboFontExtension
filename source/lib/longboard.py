@@ -68,6 +68,10 @@ interactionSourcesLibKey = toolID + ".interactionSources"
 
 previewAlignOptions = ['leftOutside', 'left', 'center', 'right', 'rightOutside']
 
+#extensionName = "🛹"
+extensionName = "Longboard"
+
+
 # Extension defaults example
 #https://robofont.com/documentation/how-tos/mojo/read-write-defaults/
 extensionDefaultKey = toolID + ".defaults"
@@ -207,12 +211,14 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         #align.horizontal.left
         
         content = """
-
-        (interestingLocations ...)      @interestingLocationsPopup
-
         | ----------------- |           @axesTable
         | xx | tf | pu | av |
         | ----------------- |
+
+        * Accordion: Designspace Locations          @locations 
+
+        > * HorizontalStack             @locationsStack        
+        >> (interestingLocations ...)   @interestingLocationsPopup
 
         * Accordion: Tools              @tools 
 
@@ -231,7 +237,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >> (X MutatorMath X| VarLib )   @mathModelButton
         >> [ ] Allow Extrapolation      @allowExtrapolation
 
-        * Accordion: Show              @appearance 
+        * Accordion: What to Show              @appearance 
 
         > ----
         > * HorizontalStack             @appearanceStack       
@@ -247,7 +253,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showVectors
 
-        * Accordion: About              @about     
+        * Accordion: About this              @about     
         > ----
         > ((( 􀍟 LettError | 􁅁 Designspace Help | 􀊵 Sponsor )))   @linksButton
         #> (Test Apply State)           @testApplyState
@@ -347,7 +353,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             ),
         )
         self.w = ezui.EZWindow(
-            title= f"🛹",
+            title= extensionName,
             content=content,
             descriptionData=descriptionData,
             controller=self,
@@ -497,7 +503,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     
     def designspaceEditorDidCloseDesignspace(self, info):
         self.w.getItem("axesTable").set([])
-        self.w.setTitle("🛹")
+        self.w.setTitle(extensionName)
         self.enableActionButtons(False)
     
     def designspaceEditorDidOpenDesignspace(self, info):
@@ -713,6 +719,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         popOptions = ['horizontal', 'vertical', None]
         data = info["lowLevelEvents"][-1].get('data')
         nav = data['horizontal'], data['vertical']
+        #viewScale = info.get('viewScale', 1)
 
         # @@_mouse_drag_updating_data
         editorObject = data['editor']
@@ -856,9 +863,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 break
         if self.operator.path is not None:
             if glyphName is not None:
-                self.w.setTitle(f"🛹 {operatorFileName} {glyphName}")
+                self.w.setTitle(f"{extensionName}: {operatorFileName}: {glyphName}")
             else:
-                self.w.setTitle(f"🛹 {operatorFileName}")
+                self.w.setTitle(f"{extensionName}: {operatorFileName}")
     
     def showPreviewCallback(self, sender):
         # LongBoardUIController
@@ -995,7 +1002,7 @@ class LongboardEditorView(Subscriber):
         self.instanceMarkerSize = 4
         self.sourceMarkerSize = 3
         self.measureLineCurveOffset = 50
-        self.selectionTextOffset = 10
+        self.selectionTextOffset = 15
         self.marginLineHeight = 50    # the height of the margin line in the preview
         self.setColors()
     
@@ -1198,6 +1205,7 @@ class LongboardEditorView(Subscriber):
                 'previewLocation': self.previewLocation_dragging,
                 'horizontal': dx,
                 'vertical': dy,
+                'viewScale': viewScale,
                 }
         publishEvent(navigatorLocationChangedEventKey, data=data)
     
@@ -1205,10 +1213,10 @@ class LongboardEditorView(Subscriber):
         #@@ 
         # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
         myMenuItems = [
-            ("Copy 🛹 Preview", self.copyPreviewMenuCallback),
-            ("Copy 🛹 Preview (Rounded)", self.copyRoundedPreviewMenuCallback),
+            (f"Copy {extensionName} Preview", self.copyPreviewMenuCallback),
+            (f"Copy {extensionName} Preview (Rounded)", self.copyRoundedPreviewMenuCallback),
             "----",
-            ("Show 🎁 Location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+            ("Show Random Location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
         ]
         info["itemDescriptions"].extend(myMenuItems)
 
@@ -1300,7 +1308,12 @@ class LongboardEditorView(Subscriber):
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
-    def glyphEditorGlyphDidChangeSelection(self, info):
+    def glyphDidChangeSelection(self, info):
+        # LongBoardUIController @@
+        self.updateInstanceOutline(rebuild=True)
+    
+    def glyphEditorGlyphDidStartChangeSelection(self, info):
+        print("xx glyphEditorGlyphDidStartChangeSelection")
         # LongBoardUIController @@
         self.updateInstanceOutline(rebuild=True)
     
@@ -1376,7 +1389,7 @@ class LongboardEditorView(Subscriber):
                     previewPoint = previewGlyph.contours[ci].points[pi]
                     markers.append((ci, pi, previewPoint.x, previewPoint.y))
         for ci, pi, px, py in markers:
-            textPos = (px, py-self.selectionTextOffset)    #!
+            textPos = (px, py+self.selectionTextOffset)    #!
             selectionLayerName = f"selectionMarker_{editorGlyph.name}_{ci}_{pi}"
             selectionLayer = self.selectionLayer.getSublayer(selectionLayerName)
             if selectionLayer is None:
@@ -1634,9 +1647,10 @@ class LongboardEditorView(Subscriber):
                     wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
                     wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
                     wdthAbs = currentStats['width'] - self.startInstanceStats['width']
-                    statsText += f"\n\n{self._bar}"
+                    #statsText += f"\n\n{self._bar}"
                     continousAxesText = ""
                     discreteAxesText = ""
+                    axisNameLength = 14
                     for axisName, axisValue in self.previewLocation_dragging.items():
                         dragIndicator = ""
                         # to show which drag direction this axis responds to
@@ -1651,15 +1665,15 @@ class LongboardEditorView(Subscriber):
                                         dragIndicator = "✕"
                             if type(axisValue) == tuple:
                                 # could be anisotropic
-                                continousAxesText += f"\n{dragIndicator}\t{axisName[:7]}\t{axisValue[0]:>9.4f}"
+                                continousAxesText += f"\n{axisValue[0]:>13.2f}    {dragIndicator} {axisName[:7]:<9}"
                             else:
-                                continousAxesText += f"\n{dragIndicator}\t{axisName[:7]}\t{axisValue:>9.4f}"
+                                continousAxesText += f"\n{axisValue:>13.2f}    {dragIndicator} {axisName[:7]:<9}"
                         elif axisName in self.discreteAxisNames:
-                            discreteAxesText += f"\n:\t{axisName[:7]}\t{int(axisValue):>13d}"
+                            discreteAxesText += f"\n{int(axisValue):>13d}    : {axisName[:7]} "
                     statsText += continousAxesText
                     statsText += discreteAxesText
-                    statsText += f"\n{self._bar}"
-                    statsText += f"\nΔ\tarea \t{wghtPercent:>8.2f}\t%\nΔ\twidth\t{wdthPercent:>8.2f}\t%\nabs\twidth\t{wdthAbs:>8}\tu"
+                    #statsText += f"\n{self._bar}"
+                    statsText += f"\n{wghtPercent:>13.2f} %  Δ area \n{wdthPercent:>13.2f} %  Δ width \n{wdthAbs:>13} u  abs width"
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
                     # this needs a bit of work..
@@ -1677,7 +1691,7 @@ class LongboardEditorView(Subscriber):
                             position=textPos,
                             pointSize=11,
                             fillColor=self.measurementFillColor,
-                            horizontalAlignment=self.statsAlign,
+                            horizontalAlignment="left",
                             )
                     if statsTextLayer is not None:
                         statsTextLayer.setText(statsText)
