@@ -252,6 +252,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [X] Show Stats              @showStats
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showVectors
+        >>> [ ] Show in Preview         @showVectors
 
         * Accordion: About this              @about     
         > ----
@@ -1313,7 +1314,6 @@ class LongboardEditorView(Subscriber):
         self.updateInstanceOutline(rebuild=True)
     
     def glyphEditorGlyphDidStartChangeSelection(self, info):
-        print("xx glyphEditorGlyphDidStartChangeSelection")
         # LongBoardUIController @@
         self.updateInstanceOutline(rebuild=True)
     
