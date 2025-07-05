@@ -83,6 +83,19 @@ from mojo.events import (
 )
 
 
+# get the scales from the axes 
+def getAxisScales(operator):
+    # Shared
+    scales = {}
+    if operator is None:
+        return 0.025    # !
+    for aD in operator.getOrderedContinuousAxes():
+        aD_minimum = aD.map_forward(aD.minimum)
+        aD_maximum = aD.map_forward(aD.maximum)
+        scales[aD.name] = (aD_maximum - aD_minimum)
+    return scales
+
+
 def glyphEditorIsInZoom():
     # detect if we're zooming at the moment
     tool = getActiveEventTool()
@@ -132,7 +145,6 @@ class LongboardNavigatorTool(BaseEventTool):
     def getToolbarIcon(self):
         ## return the toolbar icon
         return toolbarIcon
-
 
 longBoardToolBundle = ExtensionBundle("Longboard")
 toolbarIcon = longBoardToolBundle.getResourceImage("icon", ext='pdf')
@@ -692,21 +704,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         # send the settings info to the subscriber
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
-
-    def getAxisScales(self):
-        scales = {}
-        if self.operator is None:
-            return 0.025    # !
-        for aD in self.operator.getOrderedContinuousAxes():
-            aD_minimum = aD.map_forward(aD.minimum)
-            aD_maximum = aD.map_forward(aD.maximum)
-            scales[aD.name] = (aD_maximum - aD_minimum)
-        return scales
         
     def navigatorLocationChanged(self, info):
         # LongBoardUIController
         # receive notifications about the navigator location changing.
         # scale mouse movement to "increment units"
+        # may be called by operatorPreviewLocationNudge
         # operator has the axes data
         # glypheditor has the viewscale
         # UI has the axis masks
@@ -720,31 +723,41 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         popOptions = ['horizontal', 'vertical', None]
         data = info["lowLevelEvents"][-1].get('data')
         nav = data['horizontal'], data['vertical']
-        #viewScale = info.get('viewScale', 1)
-
-        # @@_mouse_drag_updating_data
-        editorObject = data['editor']
+        nudge = data.get('nudge', None)
 
         unit = {}
         for axis in self.w.getItem("axesTable").get():
             name = axis['textValue']
             if axis['popUpValue'] == 0:     # horizontal
-                unit[name] = data['horizontal']
+                if nudge:
+                    # nudges come from arrow keys in the navigator tool
+                    # so, a single unit along the axis
+                    unit[name] = nudge[0]
+                else:
+                    unit[name] = data['horizontal']
             elif axis['popUpValue'] == 1:     # vertical
-                unit[name] = data['vertical']
+                if nudge:
+                    unit[name] = nudge[1]
+                else:
+                    unit[name] = data['vertical']
             # and for ignore we don't pass anything
-        axisScales = self.getAxisScales()
+        axisScales = getAxisScales(self.operator)
+        # @@_mouse_drag_updating_data
+        editorObject = data['editor']
         extreme = []
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
                 value = editorObject.previewLocation_dragging[axisName]
-                # @@ how to  handle anisotropy here?
-                if type(value) == tuple: 
-                    value = value[0]
-                value += (offset/1000) * axisScales[axisName]/25 # slightly less subjective
-                # Explanation: the 1000 is a value that relates to the screen and the number
-                # of pixels we want to move in order to travel along the whole axis.
-                # The axisScales[axisName] value is the span of the min axis / max axis value.
+                if nudge:
+                    value += offset
+                else:
+                    # @@ how to  handle anisotropy here?
+                    if type(value) == tuple: 
+                        value = value[0]
+                    value += (offset/1000) * axisScales[axisName]/25 # slightly less subjective
+                    # Explanation: the 1000 is a value that relates to the screen and the number
+                    # of pixels we want to move in order to travel along the whole axis.
+                    # The axisScales[axisName] value is the span of the min axis / max axis value.
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
@@ -951,6 +964,7 @@ class LongboardEditorView(Subscriber):
     debug = True
     longBoardHazeFactor = 0.5    # check this is the same as the default slider setting
     italicSlantOffsetKey = 'com.typemytype.robofont.italicSlantOffset'
+    _eventKeyCodes = {126:'up', 123:'left', 125:'down', 124:'right'}
 
     def setColors(self, active=False):
         # dark mode / light mode
@@ -1326,6 +1340,44 @@ class LongboardEditorView(Subscriber):
         self.updateSourcesOutlines(rebuild=True)
         self.updateInstanceOutline(rebuild=True)
 
+    def glyphEditorDidKeyDown(self, info):
+        # see if we can capture the arrow keys here.
+        if info["lowLevelEvents"][-1]["tool"].__class__.__name__ != "LongboardNavigatorTool": return
+        if not self.operator: return
+        #self._eventKeyCodes = {126:'up', 123:'left', 125:'down', 124:'right'}
+        keyCode = self._eventKeyCodes.get(info["lowLevelEvents"][-1]['event'].keyCode())
+        # note we can theoretically use this to jump along discrete axes, yes?
+        if keyCode == 'up':
+            # nudge current location up by nugget
+            self.operatorPreviewLocationNudge(0, 1)
+        elif keyCode == 'down':
+            # nudge current location up by nugget
+            self.operatorPreviewLocationNudge(0, -1)
+        elif keyCode == 'left':
+            # nudge current location up by nugget
+            self.operatorPreviewLocationNudge(-1, 0)
+        elif keyCode == 'right':
+            # nudge current location up by nugget
+            self.operatorPreviewLocationNudge(1, 0)
+        
+    def operatorPreviewLocationNudge(self, dx=0, dy=0):
+        # LongboardEditorView
+        # Respond to keyboard inputs
+        # nudge the preview location one unit along the axes that
+        # are mapped to this direction.
+        axisScales = getAxisScales(self.operator)
+        factor = 1
+        data = {
+                'editor': self, 
+                'previewLocation': self.previewLocation_dragging,
+                'horizontal': dx*factor,
+                'vertical': dy*factor,
+                'nudge': (dx, dy),
+                'viewScale': 1,
+                }
+        publishEvent(navigatorLocationChangedEventKey, data=data)
+            
+            
     def checkExtrapolation(self, location):
         # LongboardEditorView
         # check if the axis Value for axis name is in between minimum and maximum
@@ -1360,7 +1412,7 @@ class LongboardEditorView(Subscriber):
         if not relevant:
             return
         self.updateInstanceOutline(rebuild=True)
-    
+        
     def findKinks(self, editorGlyph, previewShift, previewGlyph):
         # LongboardEditorView
         # analyse and draw lines for possible kinks
