@@ -1026,6 +1026,7 @@ class LongboardEditorView(Subscriber):
         self.setPreferences()
         self.operator = None
         self.currentOperator = None
+        self.currentPreviewGlyph = None
         self.allowExtrapolation = False    # should we show extrapolation
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
@@ -1225,16 +1226,66 @@ class LongboardEditorView(Subscriber):
         publishEvent(navigatorLocationChangedEventKey, data=data)
     
     def glyphEditorWantsContextualMenuItems(self, info):
-        #@@ 
+        # Build a contextual menu for longboard.
+        # Put all the items in a Longboard > submemu
         # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
+
         myMenuItems = [
-            (f"Copy {extensionName} Preview", self.copyPreviewMenuCallback),
-            (f"Copy {extensionName} Preview (Rounded)", self.copyRoundedPreviewMenuCallback),
-            "----",
-            ("Show Random Location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+            (extensionName,
+                [
+                    (f"Copy preview", self.copyPreviewMenuCallback),
+                    (f"Copy rounded preview", self.copyRoundedPreviewMenuCallback),
+                    (f"Guideline through selection", self.guideThroughSelectionMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+                    "----",
+                    (f"Show random location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+                ],
+            )
         ]
         info["itemDescriptions"].extend(myMenuItems)
+        
+    
+    def guideThroughSelectionMenuCallback(self, sender):
+        # collect the selected points
+        # if we have exactly 2:
+        #    add menu item for guide through these points
+        #    as they are in the preview
+        #    and remove any existing guides with the same name
 
+        if self.currentPreviewGlyph is None:
+            return
+
+        editorGlyph = self.getGlyphEditor().getGlyph()
+        pfp = editorGlyph.asFontParts()
+                    
+        selectedPoints = []
+        
+        for ci, c in enumerate(pfp.contours):
+            for pi, p in enumerate(c.points):
+                if p.selected:
+                    #selection.append((ci, pi))
+                    previewPoint = self.currentPreviewGlyph.contours[ci].points[pi]
+                    selectedPoints.append((ci, pi, previewPoint.x, previewPoint.y))
+        if len(selectedPoints)==2:
+            p0 = selectedPoints[0]
+            p1 = selectedPoints[1]
+            
+            # we get the indices as well
+            # (1, 16, 604.5333333333333, 438.5966666666667) (1, 17, 615.7166666666667, 469.0366666666667)            
+            angle = math.degrees(math.atan2(p1[3]-p0[3], p1[2]-p0[2]))
+            
+            # remove any guides with the same name
+            removeGuides = []
+            for gl in pfp.guidelines:
+                if gl.name is None: continue
+                if extensionName in gl.name:
+                    removeGuides.append(gl)
+            for gl in removeGuides:
+                pfp.removeGuideline(gl)
+            # and add it to the fontparts glyph.
+            pfp.addGuide(p1[2:], angle=angle, name=extensionName)
+                    
+            
+            
     def copyPreviewMenuCallback(self, sender):
         # callback for the glypheditor contextual menu
         result = copyPreviewToClipboard(self.operator, useVarlib=self.wantsVarLib, roundResult=False)
@@ -1664,7 +1715,9 @@ class LongboardEditorView(Subscriber):
 
         ds = self.operator
         sourcePens = []
-            
+        
+        self.currentPreviewGlyph = None
+        
         # # boldly assume a font is only in a single discrete location
         cl, dl = getLocationsForFont(editorGlyph.font, ds)
         continuousLocationForCurrentSource = {}
@@ -1688,6 +1741,7 @@ class LongboardEditorView(Subscriber):
 
             shift = self.getPreviewOffsetForAlignOption(previewGlyph.width, editorGlyph.width, self.previewAlign)
             previewGlyph.moveBy((shift, 0))
+            self.currentPreviewGlyph = previewGlyph
 
             if self.showStats:
                 if self.startInstanceStats == None:
