@@ -70,7 +70,8 @@ previewAlignOptions = ['leftOutside', 'left', 'center', 'right', 'rightOutside']
 
 #extensionName = "🛹"
 extensionName = "Longboard"
-
+locationListSourceMarker = "🖤"
+locationListInstanceMarker = "✨"
 
 # Extension defaults example
 #https://robofont.com/documentation/how-tos/mojo/read-write-defaults/
@@ -264,7 +265,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [X] Show Stats              @showStats
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showVectors
-        >>> [ ] Show in Preview         @showVectors
+        >>> [ ] Show in Preview         @showPreview
 
         * Accordion: About this              @about     
         > ----
@@ -396,7 +397,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             # make sure to remove items that are no longer part of the UI
             # otherwise I have to bother Tal with dumb questions.
         except AttributeError:
-            print(f"LongBoard reports (b):")
+            print(f"LongBoard reports:")
             print(traceback.format_exc())
             pass
     
@@ -859,14 +860,14 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     layerName = f", layer {src.layerName}"
                 else:
                     layerName = ""
-                interestingLocations.append((src.location, f"🟠 {os.path.basename(src.path)}{layerName}"))
+                interestingLocations.append((src.location, f"{locationListSourceMarker} {os.path.basename(src.path)}{layerName}"))
             itemIndex += 1
         # add instance locations
         for instance in self.operator.instances:
             dsloc = instance.getFullDesignLocation(self.operator) # converted
             dsLoc, dsLocDiscrete = self.operator.splitLocation(dsloc)
             if dsloc is not None:
-                interestingLocations.append((dsloc, f'🔘 Instance {instance.familyName} {instance.styleName}'))
+                interestingLocations.append((dsloc, f'{locationListInstanceMarker} Instance {instance.familyName} {instance.styleName}'))
             itemIndex += 1
         self.interestingLocations = interestingLocations
         self.w.getItem("interestingLocationsPopup").setItems([b for a, b in interestingLocations])
@@ -1015,7 +1016,7 @@ class LongboardEditorView(Subscriber):
         self.kinkStrokeDash = None    #(0, 16)
         self.kinkStrokeWidth = 4
         self.instanceMarkerSize = 4
-        self.sourceMarkerSize = 3
+        #self.sourceMarkerSize = 3
         self.measureLineCurveOffset = 50
         self.selectionTextOffset = 15
         self.marginLineHeight = 50    # the height of the margin line in the preview
@@ -1052,6 +1053,7 @@ class LongboardEditorView(Subscriber):
         self.draggingSlowModeFactor = 0.05
         self.preparePreview = False
         self.startInstanceStats = None   # when we start dragging, the initial surface area
+        self.ratioMeasurements = []
         self._lastEventTime = None
         self.previewLocation_dragging = None    # local editing copy of the DSE2 preview location
         self._bar = "-" * 22
@@ -1488,9 +1490,13 @@ class LongboardEditorView(Subscriber):
         for ci, c in enumerate(pfp.contours):
             for pi, p in enumerate(c.points):
                 if p.selected:
-                    selection.append((ci, pi))
-                    previewPoint = previewGlyph.contours[ci].points[pi]
-                    markers.append((ci, pi, previewPoint.x, previewPoint.y))
+                    try:
+                        selection.append((ci, pi))
+                        previewPoint = previewGlyph.contours[ci].points[pi]
+                        markers.append((ci, pi, previewPoint.x, previewPoint.y))
+                    except IndexError:
+                        print(f"LongBoard reports:")
+                        print(traceback.format_exc())
         for ci, pi, px, py in markers:
             textPos = (px, py+self.selectionTextOffset)    #!
             selectionLayerName = f"selectionMarker_{editorGlyph.name}_{ci}_{pi}"
@@ -1521,6 +1527,10 @@ class LongboardEditorView(Subscriber):
         # LongboardEditorView
         # draw intersections for the current measuring beam and the current preview
         # only update the layers
+        showRatio = False
+        if len(editorGlyph.measurements) == 2:
+            showRatio = True
+        self.ratioMeasurements = []
         for measurementIndex, m in enumerate(editorGlyph.measurements):
             if m.startPoint is None or m.endPoint is None:
                 continue
@@ -1590,6 +1600,7 @@ class LongboardEditorView(Subscriber):
                 textOffsetFactor = 0.52    # slightly further out, subjective value.
                 textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
                 dist = math.hypot(mp1[0]-mp2[0], mp1[1]-mp2[1])
+                self.ratioMeasurements.append(dist)
                 measurementTextLayerName = f"measurementText_{editorGlyph.name}_{measurementIndex}_{i}"
                 measurementTextLayer = self.measurementTextLayer.getSublayer(measurementTextLayerName)
                 if measurementTextLayer is None:
@@ -1780,6 +1791,13 @@ class LongboardEditorView(Subscriber):
                     statsText += discreteAxesText
                     #statsText += f"\n{self._bar}"
                     statsText += f"\n{wghtPercent:>13.2f} %  Δ area \n{wdthPercent:>13.2f} %  Δ width \n{wdthAbs:>13} u  abs width"
+                    if len(self.ratioMeasurements)==2:
+                        a, b = self.ratioMeasurements
+                        if a != 0 and b != 0:
+                            mn = min(a, b)
+                            mx = max(a, b)
+                            statsText += f"\n{mx/mn:>13.3f} measurement ratio"
+
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
                     # this needs a bit of work..
@@ -1857,60 +1875,60 @@ class LongboardEditorView(Subscriber):
                         )
                 previewLayer.setPath(path)
                 
-                if self.showVectors:
-                    # 03 on curve markers on instance outline
-                    for im, m in enumerate(cpPreview.onCurves):
-                        # layer append or update? 14 @@
-                        onCurveSymbolLayerName = f'preview_onCurve_{editorGlyph.name}_marker_{im}'
-                        onCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(onCurveSymbolLayerName)
-                        if onCurveSymbolLayer is None:
-                            onCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
-                                name=onCurveSymbolLayerName,
-                                #layer = self.instancePathLayer.getSublayer(layerName),
-                                imageSettings = dict(
-                                    name="oval", # name of the factory
-                                    size=(self.instanceMarkerSize, self.instanceMarkerSize),
-                                    fillColor=self.instanceStrokeColor
-                                    ),
-                                )
-                        onCurveSymbolLayer.setPosition(m)
-                    # 04 off curve markers on instance outline
-                    for im, m in enumerate(cpPreview.offCurves):
-                        # layer append or update? 15
-                        offCurveSymbolLayerName = f'preview_offCurve_{editorGlyph.name}_marker_{im}'
-                        offCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(offCurveSymbolLayerName)
-                        if offCurveSymbolLayer is None:
-                            offCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
-                                name=offCurveSymbolLayerName,
-                                imageSettings = dict(
-                                    name="oval",
-                                    size=(self.instanceMarkerSize, self.instanceMarkerSize),
-                                    fillColor=self.instanceStrokeColor
+            if self.showVectors:
+                # 03 on curve markers on instance outline
+                for im, m in enumerate(cpPreview.onCurves):
+                    # layer append or update? 14 @@
+                    onCurveSymbolLayerName = f'preview_onCurve_{editorGlyph.name}_marker_{im}'
+                    onCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(onCurveSymbolLayerName)
+                    if onCurveSymbolLayer is None:
+                        onCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
+                            name=onCurveSymbolLayerName,
+                            #layer = self.instancePathLayer.getSublayer(layerName),
+                            imageSettings = dict(
+                                name="oval", # name of the factory
+                                size=(self.instanceMarkerSize, self.instanceMarkerSize),
+                                fillColor=self.instanceStrokeColor
                                 ),
                             )
-                        offCurveSymbolLayer.setPosition(m)
-                    # 05 draw small lines for the left and right margins of the instance outline
-                    # show the margin lines at the expected angle
-                    italicSlantOffset = editorGlyph.font.lib.get(self.italicSlantOffsetKey, 0)
-                    angle = editorGlyph.font.info.italicAngle
-                    if angle is None:
-                        angle = 0
-                    angle = math.radians(90+angle)
-                    dx = math.cos(angle) * self.marginLineHeight
-                    a = (shift-dx+italicSlantOffset, -self.marginLineHeight)
-                    b = (shift+italicSlantOffset, 0)
-                    shiftRight = .5*editorGlyph.width +.5*previewGlyph.width
-                    c = (shiftRight-dx+italicSlantOffset, -self.marginLineHeight)
-                    d = (shiftRight+italicSlantOffset, 0)
-                    marginLayerName = f'instance_{editorGlyph.name}_margins'
-                    marginLinePath = merz.MerzPen()
-                    marginLinePath.moveTo(a)
-                    marginLinePath.lineTo(b)
-                    marginLinePath.endPath()
-                    marginLinePath.moveTo(c)
-                    marginLinePath.lineTo(d)
-                    marginLinePath.endPath()
-                    self.marginsPathLayer.setPath(marginLinePath.path)
+                    onCurveSymbolLayer.setPosition(m)
+                # 04 off curve markers on instance outline
+                for im, m in enumerate(cpPreview.offCurves):
+                    # layer append or update? 15
+                    offCurveSymbolLayerName = f'preview_offCurve_{editorGlyph.name}_marker_{im}'
+                    offCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(offCurveSymbolLayerName)
+                    if offCurveSymbolLayer is None:
+                        offCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
+                            name=offCurveSymbolLayerName,
+                            imageSettings = dict(
+                                name="oval",
+                                size=(self.instanceMarkerSize, self.instanceMarkerSize),
+                                fillColor=self.instanceStrokeColor
+                            ),
+                        )
+                    offCurveSymbolLayer.setPosition(m)
+                # 05 draw small lines for the left and right margins of the instance outline
+                # show the margin lines at the expected angle
+                italicSlantOffset = editorGlyph.font.lib.get(self.italicSlantOffsetKey, 0)
+                angle = editorGlyph.font.info.italicAngle
+                if angle is None:
+                    angle = 0
+                angle = math.radians(90+angle)
+                dx = math.cos(angle) * self.marginLineHeight
+                a = (shift-dx+italicSlantOffset, -self.marginLineHeight)
+                b = (shift+italicSlantOffset, 0)
+                shiftRight = .5*editorGlyph.width +.5*previewGlyph.width
+                c = (shiftRight-dx+italicSlantOffset, -self.marginLineHeight)
+                d = (shiftRight+italicSlantOffset, 0)
+                marginLayerName = f'instance_{editorGlyph.name}_margins'
+                marginLinePath = merz.MerzPen()
+                marginLinePath.moveTo(a)
+                marginLinePath.lineTo(b)
+                marginLinePath.endPath()
+                marginLinePath.moveTo(c)
+                marginLinePath.lineTo(d)
+                marginLinePath.endPath()
+                self.marginsPathLayer.setPath(marginLinePath.path)
 
     def updateSourceVectors(self, previewGlyph):
         if self.showVectors:

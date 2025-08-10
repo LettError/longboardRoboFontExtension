@@ -69,6 +69,15 @@ This panel offers links to the developer, a designspace theory help page, and th
 * Select the tool and drag the cursor around in the glyph editor to explore different axis values.
 * The preview will remain at the selected value when you switch to a different tool.
 
+## Stats
+
+These are some values that may be interesting, drawn at the bottom of the window and updated while dragging. 
+
+* The axis value, per axis. Continous axes have a **-** prefix. Discrete axes have a **:** prefix.
+* Δ area: change in glyph area, percent, measured from the start of the drag.
+* Δ width: change in glyph width, percent, measured from the start of the drag.
+* abs width, change in width, em units, measured from the start of the drag.
+* Measurement ratio: if you have 2 separate measurement lines, and each of these lines only reports 1 value, then the measurement ratio indicates the ratio between these values.
 
 ## Notes
 
@@ -92,3 +101,4 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 * 1.3.5 Add some modifier key features.
 * 1.3.6 Add stats, new screenshots.
 * 1.3.12 Show selected points, improve stats, interface
+* 1.3.14 Add ratio of measurements to stats
