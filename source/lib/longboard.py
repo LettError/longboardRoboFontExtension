@@ -267,7 +267,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [ ] Show Vectors            @showVectors
         >>> [ ] Show in Preview         @showPreview
 
-        * Accordion: About this              @about     
+        * Accordion: About Longboard    @about     
         > ----
         > ((( 􀍟 LettError | 􁅁 Designspace Help | 􀊵 Sponsor )))   @linksButton
         #> (Test Apply State)           @testApplyState
@@ -921,6 +921,20 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
 
+    # def glyphEditorWantsContextualMenuItems(self, info):
+    #     # Build a contextual menu for longboard.
+    #     # Put all the items in a Longboard > submemu
+    #     # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
+
+    #     myMenuItems = [
+    #         (extensionName,
+    #             [
+    #                 (f"Test menu from LongBoardUIController", None),
+    #             ],
+    #         )
+    #     ]
+    #     info["itemDescriptions"].extend(myMenuItems)
+
 
 
 # 
@@ -1054,6 +1068,8 @@ class LongboardEditorView(Subscriber):
         self.preparePreview = False
         self.startInstanceStats = None   # when we start dragging, the initial surface area
         self.ratioMeasurements = []
+        self.lastMeasurementRatio = None    # last calculated ratio from the measurements
+        self.lastMeasurementStats = {}        # all the stats collection, maybe for copy,
         self._lastEventTime = None
         self.previewLocation_dragging = None    # local editing copy of the DSE2 preview location
         self._bar = "-" * 22
@@ -1237,8 +1253,10 @@ class LongboardEditorView(Subscriber):
                 [
                     (f"Copy preview", self.copyPreviewMenuCallback),
                     (f"Copy rounded preview", self.copyRoundedPreviewMenuCallback),
-                    (f"Guideline through selection", self.guideThroughSelectionMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
+                    (f"Guideline through selection", self.guideThroughSelectionMenuCallback),
+                    (f"Copy stats", self.copyStatsInfoTextMenuCallback),
                     "----",
+                    (f"Clear operator cache", self.clearOperatorCacheMenuCallback),
                     (f"Show random location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
                 ],
             )
@@ -1302,6 +1320,31 @@ class LongboardEditorView(Subscriber):
         randomLocation = self.operator.randomLocation(extrapolate=0.1)
         self.operator.setPreviewLocation(randomLocation)
         self.operator.changed()
+    
+    def clearOperatorCacheMenuCallback(self, sender):
+        # callback for the glypheditor contextual menu
+        # call changed on the operator, this should clear the cache
+        self.operator.changed()
+        self.updateInstanceOutline(rebuild=True)
+    
+    def copyStatsInfoTextMenuCallback(self, sender):
+        # callback for the glypheditor contextual menu
+        # copy the stats text to clipboard
+        if not self.lastMeasurementStats:
+            return
+        
+        t = []
+        for key, value in self.lastMeasurementStats.items():
+            t.append(f"{key}\t{value}")
+        self._toPasteBoard("\n".join(t))
+        #@@ 
+    def _toPasteBoard(self, text):
+        pb = AppKit.NSPasteboard.generalPasteboard()
+        pb.clearContents()
+        pb.declareTypes_owner_([
+            AppKit.NSPasteboardTypeString,
+        ], None)
+        pb.setString_forType_(text,  AppKit.NSPasteboardTypeString)
             
     def relevantForThisEditor(self, info=None):
         # LongboardEditorView
@@ -1753,8 +1796,9 @@ class LongboardEditorView(Subscriber):
             shift = self.getPreviewOffsetForAlignOption(previewGlyph.width, editorGlyph.width, self.previewAlign)
             previewGlyph.moveBy((shift, 0))
             self.currentPreviewGlyph = previewGlyph
-
+            
             if self.showStats:
+                self.lastMeasurementStats = {}
                 if self.startInstanceStats == None:
                     self.startInstanceStats = self.collectGlyphStats(previewGlyph)
                 else:
@@ -1769,6 +1813,8 @@ class LongboardEditorView(Subscriber):
                     discreteAxesText = ""
                     axisNameLength = 14
                     for axisName, axisValue in self.previewLocation_dragging.items():
+                        self.lastMeasurementStats[axisName] = axisValue
+
                         dragIndicator = ""
                         # to show which drag direction this axis responds to
                         if axisName in self.continuousAxisNames:
@@ -1796,7 +1842,14 @@ class LongboardEditorView(Subscriber):
                         if a != 0 and b != 0:
                             mn = min(a, b)
                             mx = max(a, b)
-                            statsText += f"\n{mx/mn:>13.3f} measurement ratio"
+                            if mn != 0:
+                                self.lastMeasurementRatio = mx/mn
+                            else:
+                                self.lastMeasurementRatio = "--"
+                            self.lastMeasurementStats['ratio'] = self.lastMeasurementRatio
+                            statsText += f"\n{self.lastMeasurementRatio:>13.3f} measurement ratio"
+                    else:
+                        self.lastMeasurementRatio = None
 
                     statsTextLayerName = f'statsText_{editorGlyph.name}'
                     statsTextLayer = self.statsContainer.getSublayer(statsTextLayerName)
@@ -1822,6 +1875,7 @@ class LongboardEditorView(Subscriber):
                         statsTextLayer.setPosition(textPos)
             else:
                 self.startInstanceStats = None
+                self.lastMeasurementStats = {}
 
             # @@
             self.updateSourceVectors(previewGlyph)
