@@ -921,22 +921,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
 
-    # def glyphEditorWantsContextualMenuItems(self, info):
-    #     # Build a contextual menu for longboard.
-    #     # Put all the items in a Longboard > submemu
-    #     # https://robofont.com/documentation/how-tos/subscriber/custom-font-overview-contextual-menu/
-
-    #     myMenuItems = [
-    #         (extensionName,
-    #             [
-    #                 (f"Test menu from LongBoardUIController", None),
-    #             ],
-    #         )
-    #     ]
-    #     info["itemDescriptions"].extend(myMenuItems)
-
-
-
 # 
 # 
 # 
