@@ -1789,8 +1789,14 @@ class LongboardEditorView(Subscriber):
                     statsText = ""
                     currentStats = self.collectGlyphStats(previewGlyph)
                     diff = currentStats - self.startInstanceStats
-                    wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
-                    wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
+                    if currentStats['area'] != 0:
+                        wghtPercent = 100 - (100 * self.startInstanceStats['area']) / currentStats['area']
+                    else:
+                        wghtPercent = 0
+                    if currentStats['width'] != 0:
+                        wdthPercent = 100 - (100 * self.startInstanceStats['width']) / currentStats['width']
+                    else:
+                        wdthPercent = 0
                     wdthAbs = currentStats['width'] - self.startInstanceStats['width']
                     #statsText += f"\n\n{self._bar}"
                     continousAxesText = ""
