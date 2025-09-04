@@ -224,9 +224,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         #align.horizontal.left
         
         content = """
-        | ----------------- |           @axesTable
-        | xx | tf | pu | av |
-        | ----------------- |
+        | ------------------------ |           @axesTable
+        | xx | tf | pu | avx | avy |
+        | ------------------------ |
 
         * Accordion: Designspace Locations          @locations 
 
@@ -249,6 +249,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         > * HorizontalStack             @geometryStack       
         >> (X MutatorMath X| VarLib )   @mathModelButton
         >> [ ] Allow Extrapolation      @allowExtrapolation
+        >> [ ] Allow Anisotropy         @allowAnisotropy
 
         * Accordion: What to Show              @appearance 
 
@@ -273,7 +274,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         #> (Test Apply State)           @testApplyState
 
         """
-        wantUIWidth = 400
+        wantUIWidth = 500
         halfWidth = wantUIWidth / 2
         descriptionData = dict(
             axesTable=dict(
@@ -300,8 +301,13 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                         )
                     ),
                     dict(
-                        identifier="axisValue",
-                        title="Axis Value",
+                        identifier="axisValueX",
+                        title="Value",
+                        editable=True,
+                    ),
+                    dict(
+                        identifier="axisValueY",
+                        title="Anisotropy",
                         editable=True,
                     ),
                 ],
@@ -379,6 +385,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.interestingLocations = []    # list of the locations stored in the popup;
         self.enableActionButtons(False)
         self.wantsVarLib = False
+        self.allowAnisotropy = False
         self.previewAlign = "center"
             
     def enableActionButtons(self, state):
@@ -412,6 +419,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         #@@
         info = {}
         info["allowExtrapolation"] = self.w.getItem('allowExtrapolation').get()==1
+        info["allowAnisotropy"] = self.w.getItem('allowAnisotropy').get()==1
         info["showSources"] = self.w.getItem('showSources').get()==1
         info["showVectors"] = self.w.getItem('showVectors').get()==1
         info["showSelection"] = self.w.getItem('showSelection').get()==1
@@ -443,6 +451,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def applySettingsState(self, info):
         # apply all the values in the info dict to their places
         self.w.getItem('allowExtrapolation').set(info["allowExtrapolation"])
+        self.w.getItem('allowAnisotropy').set(info["allowAnisotropy"])
         self.w.getItem('showSources').set(info["showSources"])
         self.w.getItem('showVectors').set(info["showVectors"])
         self.w.getItem('showMeasurements').set(info["showMeasurements"])
@@ -492,6 +501,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             return random()
         testSettingsDict = {
             'allowExtrapolation': chooseOne(),
+            'allowAnisotropy': chooseOne(),
             'previewAlign': 'center',
             'showSources': chooseOne(),
             'showVectors': chooseOne(),
@@ -658,19 +668,29 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         locationFromTable = {}
         for axis in self.w.getItem("axesTable").get():
             axisName = axis['textValue']
+            #@@
             try:
-                axisValue = round(float(str(axis['axisValue'])), self.axisValueDigits)
+                axisValueX = round(float(str(axis['axisValueX'])), self.axisValueDigits)
             except ValueError:
-                axisValue = None
-            if axisValue is not None:
-                locationFromTable[axisName] = axisValue
+                axisValueX = None
+            try:
+                axisValueY = round(float(str(axis['axisValueY'])), self.axisValueDigits)
+            except ValueError:
+                axisValueY = None
+            if axisValueY is not None:
+                # something anisotropic
+                if axisValueX is not None:
+                    locationFromTable[axisName] = axisValueX, axisValueY
+            else:
+                if axisValueX is not None:
+                    locationFromTable[axisName] = axisValueX
             if axis['popUpValue'] == 0:     # horizontal
                 prefs.append((axisName, "horizontal"))
             elif axis['popUpValue'] == 1:     # vertical
                 prefs.append((axisName, "vertical"))
             elif axis['popUpValue'] == 2:     # vertical
                 prefs.append((axisName, "ignore"))
-        # where is the operatr coming from?
+        # where is the operator coming from?
         # can we broadcast this new location to the world?
         if self.operator is not None:
             self.operator.lib[interactionSourcesLibKey] = prefs
@@ -748,17 +768,32 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         extreme = []
         for axisName, offset in unit.items():
             if axisName in editorObject.previewLocation_dragging:
-                value = editorObject.previewLocation_dragging[axisName]
+                data = editorObject.previewLocation_dragging[axisName]
+                if isinstance(offset, tuple):
+                    offsetx, offsety = offset
+                else:
+                    offsetx = offsety = offset
+                if isinstance(data, tuple):                
+                    valuex, valuey = editorObject.previewLocation_dragging[axisName]
+                else:
+                    valuex = valuey = editorObject.previewLocation_dragging[axisName]
                 if nudge:
-                    value += offset
+                    valuex += offsetx
+                    valuey += offsety
                 else:
                     # @@ how to  handle anisotropy here?
-                    if type(value) == tuple: 
-                        value = value[0]
-                    value += (offset/1000) * axisScales[axisName]/25 # slightly less subjective
+                    #if type(value) == tuple: 
+                    #    value = value[0]
+                    #print('xx', offset, "axisScales[axisName]", axisScales[axisName])
+                    valuex += (offsetx/1000) * axisScales[axisName]/25 # slightly less subjective
+                    valuey += (offsety/1000) * axisScales[axisName]/25 # slightly less subjective
                     # Explanation: the 1000 is a value that relates to the screen and the number
                     # of pixels we want to move in order to travel along the whole axis.
                     # The axisScales[axisName] value is the span of the min axis / max axis value.
+                if valuex == valuey or not self.allowAnisotropy:
+                    value = valuex
+                else:
+                    value = (valuex, valuey)
                 editorObject.previewLocation_dragging[axisName] = value
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
@@ -816,20 +851,26 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 elif interaction == "vertical":
                     v = 1
                 if not axisName in currentLocation:
-                    axisValue = "-"
+                    axisValueX = "-"
+                    axisValueY = ""
                 else:
                     value = currentLocation[axisName]
-                    if type(value) is tuple:
-                        roundedValue = round(value[0], self.axisValueDigits), round(value[1], self.axisValueDigits)
+                    if isinstance(value, tuple):
+                        axisValueX = round(value[0], self.axisValueDigits)
+                        axisValueY = round(value[1], self.axisValueDigits)
                     else:
-                        roundedValue = round(value, self.axisValueDigits)
-                items.append(dict(textValue=axisName, popUpValue=v, axisValue=roundedValue))
+                        axisValueX = round(value, self.axisValueDigits)
+                        axisValueY = ""
+                if self.allowAnisotropy:
+                    items.append(dict(textValue=axisName, popUpValue=v, axisValueX=axisValueX, axisValueY=axisValueY))
+                else:
+                    items.append(dict(textValue=axisName, popUpValue=v, axisValueX=axisValueX, axisValueY=""))
             for axisRecord in self.operator.getOrderedContinuousAxes():
                 # an axis may have been added since the last time
                 # this pref was saved. So check if we have seen all of them.
                 if axisRecord.name in seen: continue
                 aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
-                items.append(dict(textValue=axisRecord.name, popUpValue=2, axisValue=aD_default))
+                items.append(dict(textValue=axisRecord.name, popUpValue=2, axisValueX=aD_default, axisValueY=""))
         else:
             v = 0
             for axisObject in self.operator.getOrderedContinuousAxes():
@@ -900,6 +941,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     
     def allowExtrapolationCallback(self, sender):
         # LongBoardUIController
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+        
+    def allowAnisotropyCallback(self, sender):
+        # LongBoardUIController
+        print("allowAnisotropyCallback", sender.get())
+        self.allowAnisotropy = sender.get() == 1
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
@@ -1027,6 +1074,7 @@ class LongboardEditorView(Subscriber):
         self.currentOperator = None
         self.currentPreviewGlyph = None
         self.allowExtrapolation = False    # should we show extrapolation
+        self.allowAnisotropy = False    # should we show anisotropy
         self.extrapolating = False    # but are we extrapolating?
         self.showPreview = True
         self.showKinks = True
@@ -1061,6 +1109,7 @@ class LongboardEditorView(Subscriber):
         self.estimatedStatsTextWidth = 22 * 10
 
         self.allowExtrapolation = False
+        self.allowAnisotropy = False    # should we show anisotropy
         self.longBoardHazeFactor = 0.5
         self.discreteAxisNames = []
         self.continuousAxisNames = []
@@ -1204,6 +1253,10 @@ class LongboardEditorView(Subscriber):
         # we're also going to pass the editor object
         # because the UI needs to call a redraw afterwards
         
+        #
+        optionDown = info.get("deviceState").get('optionDown') == 524288
+        print(optionDown)
+        
         # @@_mouse_drag_updating_data
         dx = self.navigatorToolProgress[0]/timeSinceLastEvent
         dy = self.navigatorToolProgress[1]/timeSinceLastEvent
@@ -1218,6 +1271,10 @@ class LongboardEditorView(Subscriber):
             # option pressed: slower speed
             dx *= self.draggingSlowModeFactor
             dy *= self.draggingSlowModeFactor
+        
+        if optionDown:
+            dx = (0, dx)
+            
         data = {
                 'editor': self, 
                 'previewLocation': self.previewLocation_dragging,
@@ -1466,10 +1523,16 @@ class LongboardEditorView(Subscriber):
         for axisName in location:
             axisRecord = axes.get(axisName)
             if axisRecord is None: continue
+            #@@
             if hasattr(axisRecord, "minimum"):
                 # probably continuous, discrete axes don't extrapolate
                 aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
-                if not (aD_minimum <= location.get(axisRecord.name) <= aD_maximum): 
+                axisValue = location.get(axisRecord.name)
+                if isinstance(axisValue, tuple):
+                    valuex, valuey = axisValue
+                else:
+                    valuex = valuey = axisValue
+                if not (aD_minimum <= valuex <= aD_maximum) and not (aD_minimum <= valuex <= aD_maximum): 
                     return True
         return False
         
@@ -1818,7 +1881,8 @@ class LongboardEditorView(Subscriber):
                                         dragIndicator = "✕"
                             if type(axisValue) == tuple:
                                 # could be anisotropic
-                                continousAxesText += f"\n{axisValue[0]:>13.2f}    {dragIndicator} {axisName[:7]:<9}"
+                                continousAxesText += f"\n{axisValue[0]:>13.2f}X   {dragIndicator} {axisName[:7]:<9}"
+                                continousAxesText += f"\n{axisValue[1]:>13.2f}Y   {dragIndicator} {axisName[:7]:<9}"
                             else:
                                 continousAxesText += f"\n{axisValue:>13.2f}    {dragIndicator} {axisName[:7]:<9}"
                         elif axisName in self.discreteAxisNames:
@@ -2007,6 +2071,7 @@ class LongboardEditorView(Subscriber):
             # 'aboutClosed': True
             # }
         self.allowExtrapolation = settings["allowExtrapolation"]
+        self.allowAnisotropy = settings["allowAnisotropy"]
         self.showSources = settings["showSources"]
         self.showVectors = settings["showVectors"]
         self.showSelection = settings["showSelection"]
