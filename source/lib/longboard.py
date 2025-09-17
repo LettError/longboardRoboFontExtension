@@ -249,7 +249,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         > * HorizontalStack             @geometryStack       
         >> (X MutatorMath X| VarLib )   @mathModelButton
         >> [ ] Allow Extrapolation      @allowExtrapolation
-        >> [ ] Allow Anisotropy         @allowAnisotropy
+        >> [ ] Allow Anisotropy ⌥         @allowAnisotropy
 
         * Accordion: What to Show              @appearance 
 
@@ -264,6 +264,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [X] Show Selection          @showSelection
         >>> [X] Show Kinks              @showKinks
         >>> [X] Show Stats              @showStats
+        >>> [ ] Show Rounded            @showRounded
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showVectors
         >>> [ ] Show in Preview         @showPreview
@@ -406,7 +407,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         except AttributeError:
             print(f"LongBoard reports:")
             print(traceback.format_exc())
-            pass
     
     def collectSettingsState(self, save=False):
         # collect the state of all checkers to store in defaults
@@ -426,6 +426,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info["showMeasurements"] = self.w.getItem('showMeasurements').get()==1
         info["showKinks"] = self.w.getItem('showKinks').get()==1
         info["showStats"] = self.w.getItem('showStats').get()==1
+        info["showRounded"] = self.w.getItem('showRounded').get()==1
         info["wantsVarLib"] = self.w.getItem("mathModelButton").get() == 1
         info['hazeSlider'] = self.w.getItem('hazeSlider').get()
         info['alignPreview'] = previewAlignOptions[self.w.getItem('alignPreviewButton').get()]
@@ -457,6 +458,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.getItem('showMeasurements').set(info["showMeasurements"])
         self.w.getItem('showKinks').set(info["showKinks"])
         self.w.getItem('showStats').set(info["showStats"])
+        self.w.getItem('showRounded').set(info["showRounded"])
         self.w.getItem('hazeSlider').set(info["hazeSlider"])
         self.w.getItem('tools').setClosed(info["toolsClosed"])
         self.w.getItem('appearance').setClosed(info["appearanceClosed"])
@@ -509,6 +511,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             'showMeasurements': chooseOne(),
             'showKinks': chooseOne(),
             'showStats': chooseOne(),
+            'showRounded': chooseOne(),
             'wantsVarLib': chooseTrue(),
             'hazeSlider': chooseFactor(),
             'alignPreview': choice(previewAlignOptions),
@@ -668,6 +671,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         locationFromTable = {}
         for axis in self.w.getItem("axesTable").get():
             axisName = axis['textValue']
+            axisValueX = axisValueY = None
             #@@
             try:
                 axisValueX = round(float(str(axis['axisValueX'])), self.axisValueDigits)
@@ -767,6 +771,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         editorObject = data['editor']
         extreme = []
         for axisName, offset in unit.items():
+            #print("--->", self.allowAnisotropy, axisName, offset)
             if axisName in editorObject.previewLocation_dragging:
                 data = editorObject.previewLocation_dragging[axisName]
                 if isinstance(offset, tuple):
@@ -790,11 +795,12 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     # Explanation: the 1000 is a value that relates to the screen and the number
                     # of pixels we want to move in order to travel along the whole axis.
                     # The axisScales[axisName] value is the span of the min axis / max axis value.
-                if valuex == valuey or not self.allowAnisotropy:
-                    value = valuex
-                else:
+                if self.allowAnisotropy:
                     value = (valuex, valuey)
+                else:
+                    value = valuex
                 editorObject.previewLocation_dragging[axisName] = value
+        #print('editorObject.previewLocation_dragging', editorObject.previewLocation_dragging)
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
             # AttributeError: 'NoneType' object has no attribute 'map_forward'
@@ -945,8 +951,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
     def allowAnisotropyCallback(self, sender):
         # LongBoardUIController
-        print("allowAnisotropyCallback", sender.get())
+        #print("allowAnisotropyCallback", sender.get())
         self.allowAnisotropy = sender.get() == 1
+        #print("self.allowAnisotropy:", self.allowAnisotropy)
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
@@ -961,6 +968,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         # LongBoardUIController
         # if the stats are not showing, disable the stats align button.
         self.w.getItem('alignStatsButton').enable(self.w.getItem('showStats').get())
+        postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
+
+    def showRoundCallback(self, sender):
+        # LongBoardUIController
+        # Round the geometry to integers
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
     
     def hazeSliderCallback(self, sender):
@@ -1057,6 +1069,7 @@ class LongboardEditorView(Subscriber):
         self.sourceStrokeDash = (1, 2)
         self.instanceStrokeDash = (5, 2)
         self.instanceStrokeDashExtrapolate = (1, 3)
+        self.instanceStrokeDashAnisotropic = (10, 2)
         self.instanceStrokeWidth = 1
         self.kinkStrokeDash = None    #(0, 16)
         self.kinkStrokeWidth = 4
@@ -1090,6 +1103,7 @@ class LongboardEditorView(Subscriber):
         self.centerFactor = 0    # -1: left, 0: center, 1: right
         self.showMeasurements = True
         self.showStats = True
+        self.showRounded = False
         self.statsAlign = "center"
         self.statsRemoveOverlap = True
         self.useDiscreteLocationOfCurrentFont = True
@@ -1108,8 +1122,6 @@ class LongboardEditorView(Subscriber):
         self._dots = len(self._bar)*"."
         self.estimatedStatsTextWidth = 22 * 10
 
-        self.allowExtrapolation = False
-        self.allowAnisotropy = False    # should we show anisotropy
         self.longBoardHazeFactor = 0.5
         self.discreteAxisNames = []
         self.continuousAxisNames = []
@@ -1255,7 +1267,8 @@ class LongboardEditorView(Subscriber):
         
         #
         optionDown = info.get("deviceState").get('optionDown') == 524288
-        print(optionDown)
+        #if optionDown:
+        #    print('glyphEditorDidMouseDrag optionDown')
         
         # @@_mouse_drag_updating_data
         dx = self.navigatorToolProgress[0]/timeSinceLastEvent
@@ -1273,7 +1286,11 @@ class LongboardEditorView(Subscriber):
             dy *= self.draggingSlowModeFactor
         
         if optionDown:
+            # when option is pressed, the drag is exclusively applied as
+            # the vertical component of an anisotropic change.
+            # so this is *not* related to a vertical move in the drag.
             dx = (0, dx)
+            dy = (0, dy)
             
         data = {
                 'editor': self, 
@@ -1282,6 +1299,8 @@ class LongboardEditorView(Subscriber):
                 'vertical': dy,
                 'viewScale': viewScale,
                 }
+        
+        #print("publishing", data)
         publishEvent(navigatorLocationChangedEventKey, data=data)
     
     def glyphEditorWantsContextualMenuItems(self, info):
@@ -1610,7 +1629,11 @@ class LongboardEditorView(Subscriber):
                     fillColor=self.selectionFillColor,
                     horizontalAlignment="center",
                     )
-            selectionTextLayer.setText(f"{px:3.1f}, {py:3.1f}")
+            if self.showRounded:
+                caption = f"{int(px)}, {int(py)}"
+            else:
+                caption = f"{px:3.1f}, {py:3.1f}"
+            selectionTextLayer.setText(caption)
             selectionTextLayer.setPosition(textPos)
         
     def drawMeasurements(self, editorGlyph, previewShift, previewGlyph):
@@ -1838,6 +1861,11 @@ class LongboardEditorView(Subscriber):
             
             previewGlyph = RGlyph()
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
+
+            if self.showRounded:
+                #print("--- rounding the preview glyph")
+                previewGlyph.round()
+                
             xMin, yMin, xMax, yMax = previewGlyph.bounds
 
             shift = self.getPreviewOffsetForAlignOption(previewGlyph.width, editorGlyph.width, self.previewAlign)
@@ -1879,7 +1907,7 @@ class LongboardEditorView(Subscriber):
                                         dragIndicator = "|"
                                     else:
                                         dragIndicator = "✕"
-                            if type(axisValue) == tuple:
+                            if isinstance(axisValue, tuple):
                                 # could be anisotropic
                                 continousAxesText += f"\n{axisValue[0]:>13.2f}X   {dragIndicator} {axisName[:7]:<9}"
                                 continousAxesText += f"\n{axisValue[1]:>13.2f}Y   {dragIndicator} {axisName[:7]:<9}"
@@ -1966,6 +1994,8 @@ class LongboardEditorView(Subscriber):
                     # we're outside the axis extremes, make the preview outline more stipply
                     # we don't have to rebuild the whole path, just change the strokeDash attr.
                     instanceStrokeDash = self.instanceStrokeDashExtrapolate
+                if self.allowAnisotropy:
+                    instanceStrokeDash = self.instanceStrokeDashAnisotropic
                 # but then we do need to set it each time.
                 instanceLayer.setStrokeDash(instanceStrokeDash)
                 
@@ -2072,6 +2102,7 @@ class LongboardEditorView(Subscriber):
             # }
         self.allowExtrapolation = settings["allowExtrapolation"]
         self.allowAnisotropy = settings["allowAnisotropy"]
+        #print("editor: self.allowAnisotropy", self.allowAnisotropy)
         self.showSources = settings["showSources"]
         self.showVectors = settings["showVectors"]
         self.showSelection = settings["showSelection"]
@@ -2079,6 +2110,7 @@ class LongboardEditorView(Subscriber):
         self.showMeasurements = settings["showMeasurements"]
         self.showKinks = settings["showKinks"]
         self.showStats = settings["showStats"]
+        self.showRounded = settings["showRounded"]
         self.previewAlign = settings["alignPreview"]
         self.statsAlign = settings["alignStats"]
         self.longBoardHazeFactor = settings["hazeSlider"]
