@@ -105,4 +105,4 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 * 1.3.6 Add stats, new screenshots.
 * 1.3.12 Show selected points, improve stats, interface
 * 1.3.14 Add ratio of measurements to stats
-* 1.3.20 Add support for anisotropic navigation.
+* 1.4.0 Add support for anisotropic navigation.
