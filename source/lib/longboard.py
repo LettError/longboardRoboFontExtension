@@ -5,7 +5,9 @@
     erik@letterror.com
     October 2024
     
+    
     We Love Git
+    
 """
 
 import importlib
@@ -405,7 +407,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             # make sure to remove items that are no longer part of the UI
             # otherwise I have to bother Tal with dumb questions.
         except AttributeError:
-            print(f"LongBoard reports:")
+            print(f"LongBoard reports: (C)")
             print(traceback.format_exc())
     
     def collectSettingsState(self, save=False):
@@ -579,7 +581,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             font = self.operator.makeInstance(instanceDescriptor, decomposeComponents=False)
         except:
             self.showMessage("LongBoard can not make the preview UFO.", informativeText="I'm printing the traceback in the Output.")
-            print(f"LongBoard reports:")
+            print(f"LongBoard reports: (A)")
             print(traceback.format_exc())
             return
         self.operator.useVarlib = useVarlibState
@@ -787,9 +789,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     valuey += offsety
                 else:
                     # @@ how to  handle anisotropy here?
-                    #if type(value) == tuple: 
-                    #    value = value[0]
-                    #print('xx', offset, "axisScales[axisName]", axisScales[axisName])
                     valuex += (offsetx/1000) * axisScales[axisName]/25 # slightly less subjective
                     valuey += (offsety/1000) * axisScales[axisName]/25 # slightly less subjective
                     # Explanation: the 1000 is a value that relates to the screen and the number
@@ -800,7 +799,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                 else:
                     value = valuex
                 editorObject.previewLocation_dragging[axisName] = value
-        #print('editorObject.previewLocation_dragging', editorObject.previewLocation_dragging)
         # check for clipping here
         if self.w.getItem("allowExtrapolation").get() == 0:
             # AttributeError: 'NoneType' object has no attribute 'map_forward'
@@ -951,9 +949,9 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
     def allowAnisotropyCallback(self, sender):
         # LongBoardUIController
-        #print("allowAnisotropyCallback", sender.get())
         self.allowAnisotropy = sender.get() == 1
-        #print("self.allowAnisotropy:", self.allowAnisotropy)
+        # this could also refresh the list, but it seems like I do not have
+        # all the parts here. 
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
@@ -1265,10 +1263,7 @@ class LongboardEditorView(Subscriber):
         # we're also going to pass the editor object
         # because the UI needs to call a redraw afterwards
         
-        #
         optionDown = info.get("deviceState").get('optionDown') == 524288
-        #if optionDown:
-        #    print('glyphEditorDidMouseDrag optionDown')
         
         # @@_mouse_drag_updating_data
         dx = self.navigatorToolProgress[0]/timeSinceLastEvent
@@ -1300,7 +1295,6 @@ class LongboardEditorView(Subscriber):
                 'viewScale': viewScale,
                 }
         
-        #print("publishing", data)
         publishEvent(navigatorLocationChangedEventKey, data=data)
     
     def glyphEditorWantsContextualMenuItems(self, info):
@@ -1398,6 +1392,7 @@ class LongboardEditorView(Subscriber):
             t.append(f"{key}\t{value}")
         self._toPasteBoard("\n".join(t))
         #@@ 
+        
     def _toPasteBoard(self, text):
         pb = AppKit.NSPasteboard.generalPasteboard()
         pb.clearContents()
@@ -1604,7 +1599,7 @@ class LongboardEditorView(Subscriber):
                         previewPoint = previewGlyph.contours[ci].points[pi]
                         markers.append((ci, pi, previewPoint.x, previewPoint.y))
                     except IndexError:
-                        print(f"LongBoard reports:")
+                        print(f"LongBoard reports: (B)")
                         print(traceback.format_exc())
         for ci, pi, px, py in markers:
             textPos = (px, py+self.selectionTextOffset)    #!
@@ -1863,7 +1858,6 @@ class LongboardEditorView(Subscriber):
             mathGlyph.extractGlyph(previewGlyph.asDefcon())
 
             if self.showRounded:
-                #print("--- rounding the preview glyph")
                 previewGlyph.round()
                 
             xMin, yMin, xMax, yMax = previewGlyph.bounds
@@ -2102,7 +2096,6 @@ class LongboardEditorView(Subscriber):
             # }
         self.allowExtrapolation = settings["allowExtrapolation"]
         self.allowAnisotropy = settings["allowAnisotropy"]
-        #print("editor: self.allowAnisotropy", self.allowAnisotropy)
         self.showSources = settings["showSources"]
         self.showVectors = settings["showVectors"]
         self.showSelection = settings["showSelection"]
