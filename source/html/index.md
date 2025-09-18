@@ -41,6 +41,7 @@ Also part of the tools panel:
 
 * **MutatorMath / VarLib** switches between the mathematical model used to calculate the previews. **Varlib** is what Variable fonts use. **MutatorMath** is an older model, with better extrapolation. The differences are subtle.
 * **Allow Extrapolation** Clip the dragging with the Navigator tool to the axis extremes, or go wildly beyond. Note that Variable font technology can not extrapolate. But during the design of type, extrapolation can be a useful thing. Again, do what you need. Extrapolated previews will be drawn in a differently dashed outline.
+* **Allow Anisotropy** Press the Option key while dragging the navigator tool to interpolate the vertical coordinates separate from horizontal coordinates. With this checked you can also type the vertical axis value in the **Anisotropy** column of the axes table. Note: it may be practical to set the movement of all but one axes to “ignore” so that you can see what is happening. Can be used for subtle and precise modifcations of contrast. Or just explore the wild things.
 
 ## What to Show
 
@@ -55,6 +56,7 @@ This panel offers controls over what Longboard draws in the glyph editor. It can
 * **Show Selection** Selected points in the glyph editor will be highlighted in the preview, also showing their coordinates.
 * **Show Kinks** For point types marked **smooth** this highlights curve sections where the incoming and outgoing lines are no longer smooth.
 * **Show Stats** Collect and show some statistics about the preview instance while dragging: change in surface area, change in width, absolute change in width (in em units) as well as the axis values of the preview location.
+* **Show Rounded** All geometry gets rounded to integers, as might happen in some contexts. You will see all the points rattle. 
 * **Show Sources** draws all the sources for this glyph as well as the preview. This can be useful, but it can also be quite busy, visually. You be the judge and choose what you need. The sources are drawn centered under the current glyph.
 * **Show Vectors** draws a vector between the sources and the preview. So you can see how the points get pulled around. This can be useful to spot compatibility issues.
 
@@ -73,7 +75,7 @@ This panel offers links to the developer, a designspace theory help page, and th
 
 These are some values that may be interesting, drawn at the bottom of the window and updated while dragging. 
 
-* The axis value, per axis. Continous axes have a **-** prefix. Discrete axes have a **:** prefix.
+* The axis value, per axis. Continous axes have a **-** prefix. Discrete axes have a **:** prefix. Anisotropic values are shown in 2 rows.
 * Δ area: change in glyph area, percent, measured from the start of the drag.
 * Δ width: change in glyph width, percent, measured from the start of the drag.
 * abs width, change in width, em units, measured from the start of the drag.
@@ -84,6 +86,7 @@ These are some values that may be interesting, drawn at the bottom of the window
 * The mapping of mouse movements to axis values is done with a *Subjective Algorithm™.* That means "it works here with the designspaces I tested it with", As long as your axes have values that are roughly on a 0 - 1000 scale it will be fine, but there may be some speed issues if the axes are on a smaller scale, like 0 - 1. I may follow up on that. Otherwise, use your common sense.
 * With this tool most of the functionality that I wrote for **Skateboard** and indeed **Superolator** should be available to you. **DesignspaceEditor2** does all the heavy lifting. Longboard is a clever visualiser tool on top of DSE. I hope you enjoy. Feel free to check the GitHub sponsor page.
 * The preview location is stored in the designspace lib. If you have several designspaces open, each will have its own preview location. Save the designspace if you want to keep this location for the next session. 
+* Exploring anisotropic values can be very interesting and this tools offers access to them because they may be useful for design purposes. But you understand that such values will not work in instances and variable fonts. 
 
 ## Thanks!
 
@@ -102,3 +105,4 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 * 1.3.6 Add stats, new screenshots.
 * 1.3.12 Show selected points, improve stats, interface
 * 1.3.14 Add ratio of measurements to stats
+* 1.3.20 Add support for anisotropic navigation.
