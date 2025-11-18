@@ -1187,9 +1187,10 @@ class LongboardEditorView(Subscriber):
             strokeDash=self.vectorStrokeDash,
             strokeCap="round",
         )
-        #self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
         
         self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
+        self.anchorMarkersLayer = self.editorContainer.appendBaseSublayer()
+        self.anchorLinesLayer = self.editorContainer.appendBaseSublayer()
         self.measurementsIntersectionsLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementMarkerLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementTextLayer = self.measurementContainer.appendBaseSublayer()
@@ -1434,6 +1435,8 @@ class LongboardEditorView(Subscriber):
     def destroy(self):
         # LongboardEditorView
         self.editorContainer.clearSublayers()
+        self.anchorMarkersLayer.clearSublayers()
+        self.anchorLinesLayer.clearSublayers()
         self.previewContainer.clearSublayers()
         self.measurementContainer.clearSublayers()
         self.statsContainer.clearSublayers()
@@ -1817,6 +1820,8 @@ class LongboardEditorView(Subscriber):
             self.statsContainer.clearSublayers()
             #self.statsTextLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
+            self.anchorMarkersLayer.clearSublayers()
+            self.anchorLinesLayer.clearSublayers()
             self.kinkPathLayer.setPath(None)
             self.marginsPathLayer.setPath(None)
             self.pointsPathLayer.setPath(None)
@@ -1961,10 +1966,66 @@ class LongboardEditorView(Subscriber):
 
             cpPreview = CollectorPen(glyphSet={})
             previewGlyph.draw(cpPreview)
+            
+            # draw anchors
+            anchorCount = 0
+            for anchor in previewGlyph.anchors:
+                # the dot for the anchor
+                if anchor.name is None:
+                    anchorName = f"untitledAnchor_{anchorCount}"
+                else:
+                    anchorName = anchor.name
+                anchorMarkerLayerName = f"anchorMarkers_{editorGlyph.name}_{anchorName}"
+                anchorMarkerLayer = self.anchorMarkersLayer.getSublayer(anchorMarkerLayerName)
+                if anchorMarkerLayer is None:
+                   anchorMarkerLayer = self.anchorMarkersLayer.appendSymbolSublayer(
+                       name = anchorMarkerLayerName,
+                       position=(anchor.x, anchor.y),
+                       imageSettings = dict(
+                           name="oval",
+                           size=(self.selectionMarkerSize, self.selectionMarkerSize),
+                           fillColor=self.selectionFillColor
+                           ),
+                       )
+                else:
+                    anchorMarkerLayer.setPosition((anchor.x, anchor.y))
+                # the lines for the anchor
+                anchorLinesLayerName = f"anchorLines_{editorGlyph.name}_{anchorName}"
+                anchorLinesLayer = self.anchorLinesLayer.getSublayer(anchorLinesLayerName)
+                anchorLineSize = 50 # make this scale
+                h1 = anchor.x - anchorLineSize, anchor.y
+                h2 = anchor.x + anchorLineSize, anchor.y
+                v1 = anchor.x, anchor.y - anchorLineSize
+                v2 = anchor.x, anchor.y + anchorLineSize
+
+                anchorLinePath = merz.MerzPen()
+                anchorLinePath.moveTo(h1)
+                anchorLinePath.lineTo(h2)
+                anchorLinePath.endPath()
+                anchorLinePath.moveTo(v1)
+                anchorLinePath.lineTo(v2)
+                anchorLinePath.endPath()
+
+                if anchorLinesLayer is None:
+                    anchorLinesLayer = self.anchorLinesLayer.appendPathSublayer(
+                        name = anchorLinesLayerName,
+                        strokeColor=self.vectorStrokeColor,
+                        strokeWidth=self.instanceStrokeWidth,
+                        fillColor = None,
+                        strokeDash=self.vectorStrokeDash,
+                        strokeCap="round",
+                        path = anchorLinePath.path
+                    )
+                else:
+                    anchorLinesLayer.setPath(anchorLinePath.path)
+
+                anchorCount += 1
+            
             if self.showMeasurements:
                 self.drawMeasurements(editorGlyph,  shift, previewGlyph)
             if self.showKinks:
                 self.findKinks(editorGlyph,  shift, previewGlyph)
+                
 
             # draw selected points
             if self.showSelection:
