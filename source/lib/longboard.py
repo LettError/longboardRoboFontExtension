@@ -454,7 +454,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
     def applySettingsState(self, info):
         # apply all the values in the info dict to their places
         self.w.getItem('allowExtrapolation').set(info["allowExtrapolation"])
-        self.w.getItem('allowAnisotropy').set(info["allowAnisotropy"])
+        self.w.getItem('allowAnisotropy').set(info.get("allowAnisotropy", False))
         self.w.getItem('showSources').set(info["showSources"])
         self.w.getItem('showVectors').set(info["showVectors"])
         self.w.getItem('showMeasurements').set(info["showMeasurements"])
@@ -776,11 +776,11 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             #print("--->", self.allowAnisotropy, axisName, offset)
             if axisName in editorObject.previewLocation_dragging:
                 data = editorObject.previewLocation_dragging[axisName]
-                if isinstance(offset, tuple):
+                if isinstance(offset, tuple) or isinstance(offset, list):
                     offsetx, offsety = offset
                 else:
                     offsetx = offsety = offset
-                if isinstance(data, tuple):                
+                if isinstance(data, tuple) or isinstance(data, list):
                     valuex, valuey = editorObject.previewLocation_dragging[axisName]
                 else:
                     valuex = valuey = editorObject.previewLocation_dragging[axisName]
@@ -859,7 +859,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
                     axisValueY = ""
                 else:
                     value = currentLocation[axisName]
-                    if isinstance(value, tuple):
+                    if isinstance(value, tuple) or isinstance(value, list):
                         axisValueX = round(value[0], self.axisValueDigits)
                         axisValueY = round(value[1], self.axisValueDigits)
                     else:
@@ -949,9 +949,10 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         
     def allowAnisotropyCallback(self, sender):
         # LongBoardUIController
-        self.allowAnisotropy = sender.get() == 1
+        self.allowAnisotropy = (sender.get() == 1)
         # this could also refresh the list, but it seems like I do not have
         # all the parts here. 
+        print('allowAnisotropyCallback self.allowAnisotropy', self.allowAnisotropy)
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
@@ -1542,10 +1543,12 @@ class LongboardEditorView(Subscriber):
                 # probably continuous, discrete axes don't extrapolate
                 aD_minimum, aD_default, aD_maximum =  self.operator.getAxisExtremes(axisRecord)
                 axisValue = location.get(axisRecord.name)
-                if isinstance(axisValue, tuple):
+                if isinstance(axisValue, tuple) or isinstance(axisValue, list):
                     valuex, valuey = axisValue
                 else:
                     valuex = valuey = axisValue
+                # make anisotropic #@@
+                
                 if not (aD_minimum <= valuex <= aD_maximum) and not (aD_minimum <= valuex <= aD_maximum): 
                     return True
         return False
@@ -1901,7 +1904,7 @@ class LongboardEditorView(Subscriber):
                                         dragIndicator = "|"
                                     else:
                                         dragIndicator = "✕"
-                            if isinstance(axisValue, tuple):
+                            if isinstance(axisValue, tuple) or isinstance(axisValue, list):
                                 # could be anisotropic
                                 continousAxesText += f"\n{axisValue[0]:>13.2f}X   {dragIndicator} {axisName[:7]:<9}"
                                 continousAxesText += f"\n{axisValue[1]:>13.2f}Y   {dragIndicator} {axisName[:7]:<9}"
