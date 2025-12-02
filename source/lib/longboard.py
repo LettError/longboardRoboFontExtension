@@ -4,6 +4,7 @@
     
     erik@letterror.com
     October 2024
+    Novemner 2025, still at it
     
     
     We Love Git

@@ -59,6 +59,7 @@ This panel offers controls over what Longboard draws in the glyph editor. It can
 * **Show Rounded** All geometry gets rounded to integers, as might happen in some contexts. You will see all the points rattle. 
 * **Show Sources** draws all the sources for this glyph as well as the preview. This can be useful, but it can also be quite busy, visually. You be the judge and choose what you need. The sources are drawn centered under the current glyph.
 * **Show Vectors** draws a vector between the sources and the preview. So you can see how the points get pulled around. This can be useful to spot compatibility issues.
+* **Show in Preview** draws a ghost of the current preview glyph on top of the current glyph in Preview mode. Apologies for overloading the words "Current" and "Preview".
 
 ## About this
 
@@ -106,3 +107,4 @@ Visit [LettError.com](https://letterror.com) to see my fonts and other work. Tak
 * 1.3.12 Show selected points, improve stats, interface
 * 1.3.14 Add ratio of measurements to stats
 * 1.4.0 Add support for anisotropic navigation.
+* 1.4.1 Show anchors, improve text positioning
