@@ -18,6 +18,8 @@ import math, time, os, traceback
 import AppKit
 import webbrowser
 
+from merz.tools.drawingTools import NSImageDrawingTools
+
 from random import randint, choice, random
 
 import merz
@@ -84,6 +86,51 @@ from mojo.events import (
     uninstallTool,
     BaseEventTool,
 )
+
+
+
+
+import merz
+
+def longboardDotSymbolFactory(
+        size=5,
+        color=None,
+        ):
+    # create a image draw bot 
+    bot = NSImageDrawingTools((size, size))
+    bot.fill(None)
+    if not color == None:
+        bot.fill(*color)
+    bot.stroke(None)
+    bot.strokeWidth(0)
+    bot.oval(0,0,size,size)
+    # return the image
+    return bot.getImage()
+
+merz.SymbolImageVendor.registerImageFactory("longboardPointSymbol.dot", longboardDotSymbolFactory)
+
+def longboardAnchorSymbolFactory(
+        size=20,
+        color=None,
+        strokeWidth=1,
+        ):
+    # create a image draw bot 
+    bot = NSImageDrawingTools((size, size))
+
+    bot.fill(None)
+    bot.stroke(None)
+    if not color == None:
+        bot.stroke(*color)
+    bot.strokeWidth(strokeWidth)
+    bot.line((0,size/2),(size,size/2))
+    bot.line((size/2,0),(size/2,size))
+    # return the image
+    return bot.getImage()
+
+merz.SymbolImageVendor.registerImageFactory("longboardAnchorSymbol.line", longboardAnchorSymbolFactory)
+
+
+
 
 
 # get the scales from the axes 
@@ -251,7 +298,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         > * HorizontalStack             @geometryStack       
         >> (X MutatorMath X| VarLib )   @mathModelButton
         >> [ ] Allow Extrapolation      @allowExtrapolation
-        >> [ ] Allow Anisotropy ⌥         @allowAnisotropy
+        >> [ ] Allow Anisotropy ⌥       @allowAnisotropy
 
         * Accordion: What to Show              @appearance 
 
@@ -269,7 +316,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         >>> [ ] Show Rounded            @showRounded
         >>> [ ] Show Sources            @showSources
         >>> [ ] Show Vectors            @showVectors
-        >>> [ ] Show in Preview         @showPreview
+        >>> [ ] Show in Preview         @showDuringPreview
 
         * Accordion: About Longboard    @about     
         > ----
@@ -407,7 +454,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             # make sure to remove items that are no longer part of the UI
             # otherwise I have to bother Tal with dumb questions.
         except AttributeError:
-            print(f"LongBoard reports: (C)")
+            print(f"LongBoard reports: (D)")
             print(traceback.format_exc())
     
     def collectSettingsState(self, save=False):
@@ -429,6 +476,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info["showKinks"] = self.w.getItem('showKinks').get()==1
         info["showStats"] = self.w.getItem('showStats').get()==1
         info["showRounded"] = self.w.getItem('showRounded').get()==1
+        info["showDuringPreview"] = self.w.getItem('showDuringPreview').get()==1
         info["wantsVarLib"] = self.w.getItem("mathModelButton").get() == 1
         info['hazeSlider'] = self.w.getItem('hazeSlider').get()
         info['alignPreview'] = previewAlignOptions[self.w.getItem('alignPreviewButton').get()]
@@ -436,6 +484,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         info['toolsClosed'] = self.w.getItem('tools').getClosed()
         info['appearanceClosed'] = self.w.getItem('tools').getClosed()
         info['aboutClosed'] = self.w.getItem('about').getClosed()
+        
         if not save:
             # values for the subscriber, but not for the defaults
             # the preferred drag directions
@@ -461,6 +510,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.w.getItem('showKinks').set(info["showKinks"])
         self.w.getItem('showStats').set(info["showStats"])
         self.w.getItem('showRounded').set(info["showRounded"])
+        self.w.getItem('showDuringPreview').set(info["showDuringPreview"])
         self.w.getItem('hazeSlider').set(info["hazeSlider"])
         self.w.getItem('tools').setClosed(info["toolsClosed"])
         self.w.getItem('appearance').setClosed(info["appearanceClosed"])
@@ -514,6 +564,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             'showKinks': chooseOne(),
             'showStats': chooseOne(),
             'showRounded': chooseOne(),
+            'showDuringPreview': chooseOne(),
             'wantsVarLib': chooseTrue(),
             'hazeSlider': chooseFactor(),
             'alignPreview': choice(previewAlignOptions),
@@ -773,7 +824,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         editorObject = data['editor']
         extreme = []
         for axisName, offset in unit.items():
-            #print("--->", self.allowAnisotropy, axisName, offset)
             if axisName in editorObject.previewLocation_dragging:
                 data = editorObject.previewLocation_dragging[axisName]
                 if isinstance(offset, tuple) or isinstance(offset, list):
@@ -927,7 +977,7 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
             else:
                 self.w.setTitle(f"{extensionName}: {operatorFileName}")
     
-    def showPreviewCallback(self, sender):
+    def showDuringPreviewCallback(self, sender):
         # LongBoardUIController
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
 
@@ -952,7 +1002,6 @@ class LongBoardUIController(Subscriber, ezui.WindowController):
         self.allowAnisotropy = (sender.get() == 1)
         # this could also refresh the list, but it seems like I do not have
         # all the parts here. 
-        print('allowAnisotropyCallback self.allowAnisotropy', self.allowAnisotropy)
         postEvent(settingsChangedEventKey, settings=self.collectSettingsState())
         
     def showMeasurementsCallback(self, sender):
@@ -1034,7 +1083,8 @@ class LongboardEditorView(Subscriber):
         else:
             haze = self.longBoardHazeFactor
         if self.darkMode:
-            fillModel = (.5,.5,.5, .8*haze)
+            selectedModel = (1,1,1, haze)
+            fillModel = (.5,.5,.5, .9*haze)
             strokeModel = (1,1,1, haze)
             vectorModel = (.8,.8,.8, .8*haze)
             kinkModel = (1,0,0, haze)
@@ -1042,6 +1092,7 @@ class LongboardEditorView(Subscriber):
             self.measurementFillColor = (0, .8, 1, 1)
         else:
             haze = 1 - self.longBoardHazeFactor
+            selectedModel = (0,0,0, haze)
             fillModel = (.5,.5,.5, haze)
             strokeModel = (0,0,0,haze)
             vectorModel = (.2,.2,.2, haze)
@@ -1054,13 +1105,17 @@ class LongboardEditorView(Subscriber):
         self.kinkStrokeColor = kinkModel
         self.previewFillColor = fillModel
         self.previewStrokeColor = strokeModel
-        self.selectionFillColor = strokeModel
+        self.selectionFillColor = fillModel
+        self.anchorFillColor = strokeModel
+        self.selectedAnchorFillColor = selectedModel
         
     def setPreferences(self):
         # LongboardEditorView
         self.darkMode = inDarkMode()
         self.measurementMarkerSize = 4
         self.selectionMarkerSize = 6
+        self.anchorMarkerSize = 8
+        self.anchorLineSize = 30
         self.measurementStrokeWidth = 1
         self.measurementStrokeDash = (1, 3)
         self.previewStrokeDash = (4, 4)
@@ -1088,7 +1143,7 @@ class LongboardEditorView(Subscriber):
         self.allowExtrapolation = False    # should we show extrapolation
         self.allowAnisotropy = False    # should we show anisotropy
         self.extrapolating = False    # but are we extrapolating?
-        self.showPreview = True
+        self.showDuringPreview = True
         self.showKinks = True
         self.showVectors = False
         self.showSelection = True
@@ -1138,7 +1193,6 @@ class LongboardEditorView(Subscriber):
         self.selectionContainer = glyphEditor.extensionContainer(selectionContainerKey, location="foreground")
         self.selectionTextContainer = glyphEditor.extensionContainer(selectionTextContainerKey, location="foreground")
         self.statsContainer = glyphEditor.extensionContainer(statsContainerKey, location="foreground")
-        #self.statsTextLayer = self.statsContainer.appendBaseSublayer()
 
         self.previewPathLayer = self.previewContainer.appendPathSublayer(
             strokeColor = self.previewStrokeColor,
@@ -1166,6 +1220,8 @@ class LongboardEditorView(Subscriber):
             strokeDash = self.sourceStrokeDash,
             strokeCap="round",
         )
+        
+        
         self.kinkPathLayer = self.editorContainer.appendPathSublayer(
             strokeColor=self.kinkStrokeColor,
             strokeWidth=self.kinkStrokeWidth,
@@ -1187,9 +1243,13 @@ class LongboardEditorView(Subscriber):
             strokeDash=self.vectorStrokeDash,
             strokeCap="round",
         )
-        #self.sourcesMarkerLayer = self.editorContainer.appendBaseSublayer()
         
         self.instanceMarkerLayer = self.editorContainer.appendBaseSublayer()
+        self.anchorMarkersLayer = self.editorContainer.appendBaseSublayer()
+        self.anchorLinesLayer = self.editorContainer.appendBaseSublayer()
+        self.sourcesAnchorMarkersLayer = self.editorContainer.appendBaseSublayer()
+        self.sourcesAnchorLinesLayer = self.editorContainer.appendBaseSublayer()
+
         self.measurementsIntersectionsLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementMarkerLayer = self.measurementContainer.appendBaseSublayer()
         self.measurementTextLayer = self.measurementContainer.appendBaseSublayer()
@@ -1231,7 +1291,8 @@ class LongboardEditorView(Subscriber):
         self.navigatorToolPosition = None
         self._lastEventTime = None
         if self.operator is not None:
-            self.updateInstanceOutline()
+            self.updateInstanceOutline(rebuild=True)
+            self.updateSourcesOutlines(rebuild=True)
             self.operator.setPreviewLocation(self.previewLocation_dragging)
         
     def glyphEditorDidMouseDrag(self, info):
@@ -1434,6 +1495,10 @@ class LongboardEditorView(Subscriber):
     def destroy(self):
         # LongboardEditorView
         self.editorContainer.clearSublayers()
+        self.anchorMarkersLayer.clearSublayers()
+        self.anchorLinesLayer.clearSublayers()
+        self.sourcesAnchorMarkersLayer.clearSublayers()
+        self.sourcesAnchorLinesLayer.clearSublayers()
         self.previewContainer.clearSublayers()
         self.measurementContainer.clearSublayers()
         self.statsContainer.clearSublayers()
@@ -1592,6 +1657,7 @@ class LongboardEditorView(Subscriber):
         # draw the points that are selected in the editorglyph
         # in the previewGlyph.
         selection = []
+        selectedAnchors = []
         markers = []
         pfp = editorGlyph.asFontParts()
         for ci, c in enumerate(pfp.contours):
@@ -1604,17 +1670,29 @@ class LongboardEditorView(Subscriber):
                     except IndexError:
                         print(f"LongBoard reports: (B)")
                         print(traceback.format_exc())
+        for ai, a in enumerate(pfp.anchors):
+            if a.selected:
+                selectedAnchors.append(ai)
+                try:
+                    previewAnchor = previewGlyph.anchors[ai]
+                    markers.append((ai, None, previewAnchor.x, previewAnchor.y))
+                except IndexError:
+                    print(f"LongBoard reports: (C)")
+                    print(traceback.format_exc())
+                
         for ci, pi, px, py in markers:
-            textPos = (px, py+self.selectionTextOffset)    #!
+            textPos = (px, py)
             selectionLayerName = f"selectionMarker_{editorGlyph.name}_{ci}_{pi}"
             selectionLayer = self.selectionLayer.getSublayer(selectionLayerName)
             if selectionLayer is None:
                selectionLayer = self.selectionLayer.appendSymbolSublayer(
+                   name = selectionLayerName,
                    position=(px, py),
                    imageSettings = dict(
                        name="oval",
                        size=(self.selectionMarkerSize, self.selectionMarkerSize),
-                       fillColor=self.selectionFillColor
+                       fillColor=self.selectionFillColor,
+                       offset = (50, 25),
                        ),
                    )
             selectionTextLayerName = f"selectionText_{editorGlyph.name}_{ci}_{pi}"
@@ -1626,6 +1704,7 @@ class LongboardEditorView(Subscriber):
                     pointSize=9,
                     fillColor=self.selectionFillColor,
                     horizontalAlignment="center",
+                   offset = (50, 25),
                     )
             if self.showRounded:
                 caption = f"{int(px)}, {int(py)}"
@@ -1685,11 +1764,12 @@ class LongboardEditorView(Subscriber):
                 measurementMarkerLayer = self.measurementMarkerLayer.getSublayer(measurementMarkerLayerName)
                 if measurementMarkerLayer is None:
                     measurementMarkerLayer = self.measurementMarkerLayer.appendSymbolSublayer(
+                        name = measurementMarkerLayerName,
                         position=mp1,
                         imageSettings = dict(
-                            name="oval",
-                            size=(self.measurementMarkerSize, self.measurementMarkerSize),
-                            fillColor=self.measurementFillColor
+                            name="longboardPointSymbol.dot",
+                            size=self.measurementMarkerSize,
+                            color=self.measurementFillColor
                             ),
                         )
                 measurementMarkerLayer.setPosition(mp1)
@@ -1698,18 +1778,21 @@ class LongboardEditorView(Subscriber):
                 measurementMarkerLayer = self.measurementMarkerLayer.getSublayer(measurementMarkerLayerName)
                 if measurementMarkerLayer is None:
                     measurementMarkerLayer = self.measurementMarkerLayer.appendSymbolSublayer(
+                        name = measurementMarkerLayerName,
                         position=mp2,
                         imageSettings = dict(
-                            name="oval",
-                            size=(self.measurementMarkerSize, self.measurementMarkerSize),
-                            fillColor=self.measurementFillColor
+                            name="longboardPointSymbol.dot",
+                            size=self.measurementMarkerSize,
+                            color=self.measurementFillColor
                         ),
                     )
                 measurementMarkerLayer.setPosition(mp2)
                 # draw the measurement distance text
                 # .5 = halfway and that causes overlaps with the normal ruler values
                 textOffsetFactor = 0.52    # slightly further out, subjective value.
-                textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
+                #textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
+                #textPos = textOffsetFactor*(mp1[0]+mp2[0]), textOffsetFactor*(mp1[1]+mp2[1])
+                textPos = mp1
                 dist = math.hypot(mp1[0]-mp2[0], mp1[1]-mp2[1])
                 self.ratioMeasurements.append(dist)
                 measurementTextLayerName = f"measurementText_{editorGlyph.name}_{measurementIndex}_{i}"
@@ -1721,6 +1804,7 @@ class LongboardEditorView(Subscriber):
                         pointSize=11,
                         fillColor=self.measurementFillColor,
                         horizontalAlignment="center",
+                        offset = (50, 25),
                         )
                 measurementTextLayer.setText(f"{dist:3.1f}")
                 measurementTextLayer.setPosition(textPos)
@@ -1751,7 +1835,7 @@ class LongboardEditorView(Subscriber):
             # 
             sourceGlyph = RGlyph()
             srcMath.extractGlyph(sourceGlyph.asDefcon()) # mathglyph to sourceGlyph
-
+            # calculate the right shift for the selected relative positioning
             shift = self.getPreviewOffsetForAlignOption(sourceGlyph.width, editorGlyph.width, self.previewAlign)
             sourceGlyph.moveBy((shift, 0))
                 
@@ -1785,12 +1869,49 @@ class LongboardEditorView(Subscriber):
             self.darkMode = not self.darkMode
         if rebuild:
             self.sourcesPathLayer.setPath(None)
-        # merzpen
+        # draw the sources paths
         sourcePen = merz.MerzPen()
         if self.showSources:
             for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
                 sourceGlyph.draw(sourcePen)
             self.sourcesPathLayer.setPath(sourcePen.path)
+
+        if rebuild:
+            self.sourcesAnchorMarkersLayer.clearSublayers()
+            self.sourcesAnchorLinesLayer.clearSublayers()
+        if self.showSources:
+            # draw the anchors? @@
+            #self.sourcesAnchorMarkersLayer
+            anchorCount = 0
+            things = []
+            for sourceGlyphIndex, sourceGlyph in enumerate(self.sourceGlyphs):
+                # draw anchors
+                for anchor in sourceGlyph.anchors:
+                    anchorFillColor = self.anchorFillColor
+                    if anchor.selected:
+                        anchorFillColor = self.selectedAnchorFillColor
+                    # the dot for the anchor
+                    if anchor.name is None:
+                        anchorName = f"anchor_{anchorCount}_{sourceGlyphIndex}{sourceGlyphIndex}"
+                    else:
+                        anchorName = anchor.name
+                    sourcesAnchorMarkersLayerName = f"sourcesAnchorMarkers_{sourceGlyph.name}{sourceGlyphIndex}_{anchorName}"
+                    sourcesAnchorMarkersLayer = self.sourcesAnchorMarkersLayer.getSublayer(sourcesAnchorMarkersLayerName)
+                    if sourcesAnchorMarkersLayer is None:
+                        
+                        sourcesAnchorMarkersLayer = self.sourcesAnchorMarkersLayer.appendSymbolSublayer(
+                            name = sourcesAnchorMarkersLayerName,
+                            position=(anchor.x, anchor.y),
+                            imageSettings = dict(
+                                name="longboardAnchorSymbol.line",
+                                size=self.anchorLineSize,
+                                color=anchorFillColor,
+                            ),
+                        )
+                    else:
+                        sourcesAnchorMarkersLayer.setPosition((anchor.x, anchor.y))
+                        #sourcesAnchorMarkersLayer.setColor(anchorFillColor)
+            
     
     def collectGlyphStats(self, glyph):
         # stuff a couple of glyp dimensions in a location
@@ -1815,8 +1936,9 @@ class LongboardEditorView(Subscriber):
             self.instancePathLayer.clearSublayers()
             self.previewPathLayer.clearSublayers()
             self.statsContainer.clearSublayers()
-            #self.statsTextLayer.clearSublayers()
             self.instanceMarkerLayer.clearSublayers()
+            self.anchorMarkersLayer.clearSublayers()
+            self.anchorLinesLayer.clearSublayers()
             self.kinkPathLayer.setPath(None)
             self.marginsPathLayer.setPath(None)
             self.pointsPathLayer.setPath(None)
@@ -1935,11 +2057,14 @@ class LongboardEditorView(Subscriber):
                     # this needs a bit of work..
                     # ideally we'd calculate the width of the string, in local glyph editor units?
                     if self.statsAlign == "left":
-                        textPos = (shift, yMin)
+                        textPos = (shift, 0)
+                        textAlign = "right"
                     elif self.statsAlign == "right":
-                        textPos = (previewGlyph.width + shift, yMin)
+                        textPos = (previewGlyph.width + shift, 0)
+                        textAlign = "left"
                     elif self.statsAlign == "center":
-                        textPos = (0.5 * previewGlyph.width + shift, yMin)
+                        textPos = (0.5 * previewGlyph.width + shift, 0)
+                        textAlign = "center"
                     if statsTextLayer is None:
                         statsTextLayer= self.statsContainer.appendTextLineSublayer(
                             name=statsTextLayerName,
@@ -1947,7 +2072,8 @@ class LongboardEditorView(Subscriber):
                             position=textPos,
                             pointSize=11,
                             fillColor=self.measurementFillColor,
-                            horizontalAlignment="left",
+                            horizontalAlignment=textAlign,
+                            offset = (0, -100)
                             )
                     if statsTextLayer is not None:
                         statsTextLayer.setText(statsText)
@@ -1961,16 +2087,73 @@ class LongboardEditorView(Subscriber):
 
             cpPreview = CollectorPen(glyphSet={})
             previewGlyph.draw(cpPreview)
+            
+            # draw anchors
+            anchorCount = 0
+            for anchor in previewGlyph.anchors:
+                # the dot for the anchor
+                if anchor.name is None:
+                    anchorName = f"untitledAnchor_{anchorCount}"
+                else:
+                    anchorName = anchor.name
+                anchorMarkerLayerName = f"anchorMarkers_{editorGlyph.name}_{anchorName}"
+                anchorMarkerLayer = self.anchorMarkersLayer.getSublayer(anchorMarkerLayerName)
+                if anchorMarkerLayer is None:
+                   anchorMarkerLayer = self.anchorMarkersLayer.appendSymbolSublayer(
+                       name = anchorMarkerLayerName,
+                       position=(anchor.x, anchor.y),
+                       imageSettings = dict(
+                           name="longboardPointSymbol.dot",
+                           size=self.anchorMarkerSize,
+                           color=self.anchorFillColor
+                           ),
+                       )
+                else:
+                    anchorMarkerLayer.setPosition((anchor.x, anchor.y))
+
+                # # the lines for the anchor
+                # anchorLinesLayerName = f"anchorLines_{editorGlyph.name}_{anchorName}"
+                # anchorLinesLayer = self.anchorLinesLayer.getSublayer(anchorLinesLayerName)
+                # anchorLineSize = 50 # make this scale
+                # h1 = anchor.x - anchorLineSize, anchor.y
+                # h2 = anchor.x + anchorLineSize, anchor.y
+                # v1 = anchor.x, anchor.y - anchorLineSize
+                # v2 = anchor.x, anchor.y + anchorLineSize
+
+                # anchorLinePath = merz.MerzPen()
+                # anchorLinePath.moveTo(h1)
+                # anchorLinePath.lineTo(h2)
+                # anchorLinePath.endPath()
+                # anchorLinePath.moveTo(v1)
+                # anchorLinePath.lineTo(v2)
+                # anchorLinePath.endPath()
+
+                # if anchorLinesLayer is None:
+                #     anchorLinesLayer = self.anchorLinesLayer.appendPathSublayer(
+                #         name = anchorLinesLayerName,
+                #         strokeColor=self.vectorStrokeColor,
+                #         strokeWidth=self.instanceStrokeWidth,
+                #         fillColor = None,
+                #         strokeDash=self.vectorStrokeDash,
+                #         strokeCap="round",
+                #         path = anchorLinePath.path
+                #     )
+                # else:
+                #     anchorLinesLayer.setPath(anchorLinePath.path)
+
+                anchorCount += 1
+            
             if self.showMeasurements:
                 self.drawMeasurements(editorGlyph,  shift, previewGlyph)
             if self.showKinks:
                 self.findKinks(editorGlyph,  shift, previewGlyph)
+                
 
             # draw selected points
             if self.showSelection:
                 self.drawSelection(editorGlyph, shift, previewGlyph)
 
-            if self.showPreview:
+            if True:
                 # 01 stroke instance path in the editor layer
                 # layer append or update? 12
                 path = previewGlyph.getRepresentation("merz.CGPath")
@@ -1998,17 +2181,18 @@ class LongboardEditorView(Subscriber):
                 
                 # set the path in the preview layer as well
                 # layer append or update? 13
-                previewLayerName = f'instance_preview_{editorGlyph.name}'
-                previewLayer = self.previewPathLayer.getSublayer(previewLayerName)
-                if previewLayer is None:
-                    previewLayer = self.previewPathLayer.appendPathSublayer(
-                        name = previewLayerName,
-                        strokeColor = self.previewStrokeColor,
-                        strokeDash = self.previewStrokeDash,
-                        strokeWidth = 1,
-                        fillColor = self.previewFillColor,
-                        )
-                previewLayer.setPath(path)
+                if self.showDuringPreview:
+                    previewLayerName = f'instance_preview_{editorGlyph.name}'
+                    previewLayer = self.previewPathLayer.getSublayer(previewLayerName)
+                    if previewLayer is None:
+                        previewLayer = self.previewPathLayer.appendPathSublayer(
+                            name = previewLayerName,
+                            strokeColor = self.previewStrokeColor,
+                            strokeDash = self.previewStrokeDash,
+                            strokeWidth = 1,
+                            fillColor = self.previewFillColor,
+                            )
+                    previewLayer.setPath(path)
                 
             if self.showVectors:
                 # 03 on curve markers on instance outline
@@ -2018,12 +2202,12 @@ class LongboardEditorView(Subscriber):
                     onCurveSymbolLayer = self.instanceMarkerLayer.getSublayer(onCurveSymbolLayerName)
                     if onCurveSymbolLayer is None:
                         onCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
-                            name=onCurveSymbolLayerName,
+                            name = onCurveSymbolLayerName,
                             #layer = self.instancePathLayer.getSublayer(layerName),
                             imageSettings = dict(
-                                name="oval", # name of the factory
-                                size=(self.instanceMarkerSize, self.instanceMarkerSize),
-                                fillColor=self.instanceStrokeColor
+                                name="longboardPointSymbol.dot", # name of the factory
+                                size=self.instanceMarkerSize,
+                                color=self.instanceStrokeColor
                                 ),
                             )
                     onCurveSymbolLayer.setPosition(m)
@@ -2036,9 +2220,9 @@ class LongboardEditorView(Subscriber):
                         offCurveSymbolLayer = self.instanceMarkerLayer.appendSymbolSublayer(
                             name=offCurveSymbolLayerName,
                             imageSettings = dict(
-                                name="oval",
-                                size=(self.instanceMarkerSize, self.instanceMarkerSize),
-                                fillColor=self.instanceStrokeColor
+                                name="longboardPointSymbol.dot",
+                                size=self.instanceMarkerSize,
+                                color=self.instanceStrokeColor
                             ),
                         )
                     offCurveSymbolLayer.setPosition(m)
@@ -2107,6 +2291,7 @@ class LongboardEditorView(Subscriber):
         self.showKinks = settings["showKinks"]
         self.showStats = settings["showStats"]
         self.showRounded = settings["showRounded"]
+        self.showDuringPreview = settings["showDuringPreview"]
         self.previewAlign = settings["alignPreview"]
         self.statsAlign = settings["alignStats"]
         self.longBoardHazeFactor = settings["hazeSlider"]
