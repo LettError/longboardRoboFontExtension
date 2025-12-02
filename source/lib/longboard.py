@@ -1681,7 +1681,7 @@ class LongboardEditorView(Subscriber):
                     print(traceback.format_exc())
                 
         for ci, pi, px, py in markers:
-            textPos = (px, py+self.selectionTextOffset)    #!
+            textPos = (px, py)
             selectionLayerName = f"selectionMarker_{editorGlyph.name}_{ci}_{pi}"
             selectionLayer = self.selectionLayer.getSublayer(selectionLayerName)
             if selectionLayer is None:
@@ -1691,7 +1691,8 @@ class LongboardEditorView(Subscriber):
                    imageSettings = dict(
                        name="oval",
                        size=(self.selectionMarkerSize, self.selectionMarkerSize),
-                       fillColor=self.selectionFillColor
+                       fillColor=self.selectionFillColor,
+                       offset = (50, 25),
                        ),
                    )
             selectionTextLayerName = f"selectionText_{editorGlyph.name}_{ci}_{pi}"
@@ -1703,6 +1704,7 @@ class LongboardEditorView(Subscriber):
                     pointSize=9,
                     fillColor=self.selectionFillColor,
                     horizontalAlignment="center",
+                   offset = (50, 25),
                     )
             if self.showRounded:
                 caption = f"{int(px)}, {int(py)}"
@@ -1788,7 +1790,9 @@ class LongboardEditorView(Subscriber):
                 # draw the measurement distance text
                 # .5 = halfway and that causes overlaps with the normal ruler values
                 textOffsetFactor = 0.52    # slightly further out, subjective value.
-                textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
+                #textPos = textOffsetFactor*(mp1[0]+mp2[0])+needlex, textOffsetFactor*(mp1[1]+mp2[1])+needley
+                #textPos = textOffsetFactor*(mp1[0]+mp2[0]), textOffsetFactor*(mp1[1]+mp2[1])
+                textPos = mp1
                 dist = math.hypot(mp1[0]-mp2[0], mp1[1]-mp2[1])
                 self.ratioMeasurements.append(dist)
                 measurementTextLayerName = f"measurementText_{editorGlyph.name}_{measurementIndex}_{i}"
@@ -1800,6 +1804,7 @@ class LongboardEditorView(Subscriber):
                         pointSize=11,
                         fillColor=self.measurementFillColor,
                         horizontalAlignment="center",
+                        offset = (50, 25),
                         )
                 measurementTextLayer.setText(f"{dist:3.1f}")
                 measurementTextLayer.setPosition(textPos)
@@ -2052,11 +2057,11 @@ class LongboardEditorView(Subscriber):
                     # this needs a bit of work..
                     # ideally we'd calculate the width of the string, in local glyph editor units?
                     if self.statsAlign == "left":
-                        textPos = (shift, yMin)
+                        textPos = (shift, 0)
                     elif self.statsAlign == "right":
-                        textPos = (previewGlyph.width + shift, yMin)
+                        textPos = (previewGlyph.width + shift, 0)
                     elif self.statsAlign == "center":
-                        textPos = (0.5 * previewGlyph.width + shift, yMin)
+                        textPos = (0.5 * previewGlyph.width + shift, 0)
                     if statsTextLayer is None:
                         statsTextLayer= self.statsContainer.appendTextLineSublayer(
                             name=statsTextLayerName,
@@ -2065,6 +2070,7 @@ class LongboardEditorView(Subscriber):
                             pointSize=11,
                             fillColor=self.measurementFillColor,
                             horizontalAlignment="left",
+                            offset = (0, -100)
                             )
                     if statsTextLayer is not None:
                         statsTextLayer.setText(statsText)
