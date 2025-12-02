@@ -2058,10 +2058,13 @@ class LongboardEditorView(Subscriber):
                     # ideally we'd calculate the width of the string, in local glyph editor units?
                     if self.statsAlign == "left":
                         textPos = (shift, 0)
+                        textAlign = "right"
                     elif self.statsAlign == "right":
                         textPos = (previewGlyph.width + shift, 0)
+                        textAlign = "left"
                     elif self.statsAlign == "center":
                         textPos = (0.5 * previewGlyph.width + shift, 0)
+                        textAlign = "center"
                     if statsTextLayer is None:
                         statsTextLayer= self.statsContainer.appendTextLineSublayer(
                             name=statsTextLayerName,
@@ -2069,7 +2072,7 @@ class LongboardEditorView(Subscriber):
                             position=textPos,
                             pointSize=11,
                             fillColor=self.measurementFillColor,
-                            horizontalAlignment="left",
+                            horizontalAlignment=textAlign,
                             offset = (0, -100)
                             )
                     if statsTextLayer is not None:
