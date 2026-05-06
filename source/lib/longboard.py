@@ -1373,7 +1373,7 @@ class LongboardEditorView(Subscriber):
                     (f"Guideline through selection", self.guideThroughSelectionMenuCallback),
                     (f"Copy stats", self.copyStatsInfoTextMenuCallback),
                     "----",
-                    (f"Add support layer at location", self.addSuportAtLocationCallback),
+                    (f"Add support layer at location", self.addSupportAtLocationCallback),
                     "----",
                     (f"Clear operator cache", self.clearOperatorCacheMenuCallback),
                     (f"Show random location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
@@ -1436,7 +1436,7 @@ class LongboardEditorView(Subscriber):
                         reformatted[i] = pl
                 return reformatted
 
-    def addSuportAtLocationCallback(self, sender):
+    def addSupportAtLocationCallback(self, sender):
         currentPreviewLocation = self.operator.getPreviewLocation()
         glyph = CurrentGlyph()
         
