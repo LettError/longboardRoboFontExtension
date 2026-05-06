@@ -1373,6 +1373,8 @@ class LongboardEditorView(Subscriber):
                     (f"Guideline through selection", self.guideThroughSelectionMenuCallback),
                     (f"Copy stats", self.copyStatsInfoTextMenuCallback),
                     "----",
+                    (f"Add support layer at location", self.addSupportAtLocationCallback),
+                    "----",
                     (f"Clear operator cache", self.clearOperatorCacheMenuCallback),
                     (f"Show random location", self.randomLocationMenuCallback),            #("submenu", [("option 3", self.option3Callback)])    # keep for later
                 ],
@@ -1420,8 +1422,61 @@ class LongboardEditorView(Subscriber):
                 pfp.removeGuideline(gl)
             # and add it to the fontparts glyph.
             pfp.addGuide(p1[2:], angle=angle, name=extensionName)
-                    
-            
+
+    def getComparedLocation(self, fontObject):
+        # this will give us the difference between the preview location 
+        # and the current font's location within the designspace
+        previewLocation = self.operator.getPreviewLocation()
+        for (font, location) in self.operator.getFonts():
+            if font.path == fontObject.path:
+                reformatted = {}
+                for i,v in location.items():
+                    pl = previewLocation.get(i)
+                    if pl != v:
+                        reformatted[i] = pl
+                return reformatted
+
+    def addSupportAtLocationCallback(self, sender):
+        currentPreviewLocation = self.operator.getPreviewLocation()
+        glyph = CurrentGlyph()
+        
+        if glyph is None:
+            return None
+
+        location = self.getComparedLocation(glyph.font)
+        if location:
+            layerName = "support." + ".".join([f"{axis}_{round(value)}" for (axis,value) in location.items()])
+        
+            name = glyph.name
+            mathGlyph = self.operator.makeOneGlyph(name, location=currentPreviewLocation, useVarlib=self.wantsVarLib)
+            if mathGlyph is not None:
+                supportGlyph = RGlyph()
+                mathGlyph.extractGlyph(supportGlyph.asDefcon())
+                #supportGlyph.lib[copiedGlyphLocationLibKey] = currentPreviewLocation
+                supportGlyph.clearGuides()    # can be removed once fontparts fix is around
+                supportGlyph.round()
+
+            font = glyph.font
+            if layerName not in font.layerOrder:
+                font.newLayer(layerName)
+            support = font[glyph.name].getLayer(layerName)
+            support.appendGlyph(supportGlyph)
+            support.width = supportGlyph.width
+
+            for source in self.operator.sources:
+                if source.path == font.path and not source.layerName:
+                    sourceDesc = self.operator.addSourceDescriptor(
+                        path=font.path,
+                        filename=os.path.relpath(font.path, os.path.dirname(self.operator.path)),
+                        familyName=source.familyName,
+                        styleName=source.styleName,
+                        layerName=layerName,
+                        designLocation=currentPreviewLocation,
+                    )
+                    self.operator.fonts[sourceDesc.name] = font.asDefcon()
+                    self.operator.changed()
+                
+        #print(currentPreviewLocation)
             
     def copyPreviewMenuCallback(self, sender):
         # callback for the glypheditor contextual menu
